@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title></title>
+    <script type="module" src="panel.js" defer></script>
+    <link rel="stylesheet" href="panel.css">
+</head>
+<body style="min-width: 200px;">
+    <div class="header">
+        <img src="../images/icon-128.png" alt="WidevineProxy Icon" width="64"/>
+        <div class="header-right">
+            <h1>Vineless</h1>
+            Made by Ingan121<br>
+            Based on WidevineProxy2 and PlayreadyProxy2
+        </div>
+    </div>
+    <fieldset>
+        <legend>Settings</legend>
+        <div id="settings">
+            <!-- Enabled -->
+            <div>
+                <input type="checkbox" id="enabled">
+                <label for="enabled"> Enabled</label>
+            </div>
+            <!-- Dark mode -->
+            <div>
+                <label class="switch">
+                    <input type="checkbox" id="darkModeToggle">
+                    <span class="slider"></span>
+                </label>
+                <label for="enabled"> Dark mode</label>
+            </div>
+        </div>
+        <fieldset id="systems">
+            <legend>Systems</legend>
+            <div class="flex">
+                <input type="checkbox" id="wvEnabled" name="wvEnabled" checked>
+                <label for="wvEnabled">Widevine</label>
+                <input type="radio" id="wvd_select" name="cdm_type" value="wvd" checked>
+                <label for="wvd_select">Local</label>
+                <input type="radio" id="remote_select" name="cdm_type" value="remote">
+                <label for="remote_select">Remote</label>
+            </div>
+            <div>
+                <input type="checkbox" id="prEnabled" name="prEnabled" checked>
+                <label for="prEnabled">PlayReady</label>
+            </div>
+        </fieldset>
+        <fieldset id="wvd">
+            <legend>Widevine Device</legend>
+            <button type="button" id="fileInput">Choose File</button>
+            <button type="button" id="remove">Remove</button>
+            <button type="button" id="download">Download</button><br>
+            <label>
+                <select id="wvd-combobox"></select>
+            </label>
+        </fieldset>
+        <fieldset id="remote">
+            <legend>Remote Widevine CDM</legend>
+            <button type="button" id="remoteInput">Choose remote.json</button>
+            <button type="button" id="remoteRemove">Remove</button>
+            <button type="button" id="remoteDownload">Download</button><br>
+            <label>
+                <select id="remote-combobox"></select>
+            </label>
+        </fieldset>
+        <fieldset id="prd">
+            <legend>PlayReady Device</legend>
+            <button type="button" id="prdInput">Choose File</button>
+            <button type="button" id="prdRemove">Remove</button>
+            <button type="button" id="prdDownload">Download</button><br>
+            <label>
+                <select id="prd-combobox"></select>
+            </label>
+        </fieldset>
+        <fieldset id="command-options">
+            <legend>Command options</legend>
+            <input type="checkbox" id="use-shaka">
+            <label for="use-shaka"> Use Shaka Packager</label><br>
+            <label for="downloader-name">Executable name: </label>
+            <input type="text" class="text-box" id="downloader-name">
+        </fieldset>
+        <button type="button" id="export">Export Logs</button>
+    </fieldset>
+    <fieldset>
+        <legend>Keys</legend>
+        <button type="button" id="clear">Clear</button>
+        <div id="key-container"></div>
+    </fieldset>
+</body>
+</html>
