@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Vineless",
-  "version": "0.8.2",
+  "version": "1.0",
   "permissions": [
     "activeTab",
     "tabs",
@@ -46,7 +46,7 @@
   ],
   "browser_specific_settings": {
     "gecko": {
-      "id": "DevLARLEY@larley.dev",
+      "id": "vineless@ingan121.com",
       "strict_min_version": "58.0"
     }
   }
