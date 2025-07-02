@@ -279,7 +279,7 @@ export class SettingsManager {
 
     static async getEnabled() {
         const result = await AsyncSyncStorage.getStorage(["enabled"]);
-        return result["enabled"] === undefined ? false : result["enabled"];
+        return result["enabled"] === undefined ? true : result["enabled"];
     }
 
     static async setWVEnabled(wvEnabled) {
@@ -288,7 +288,7 @@ export class SettingsManager {
 
     static async getWVEnabled(real) {
         const result = await AsyncSyncStorage.getStorage(["wvEnabled"]);
-        const enabled = result["wvEnabled"] === undefined ? false : result["wvEnabled"];
+        const enabled = result["wvEnabled"] === undefined ? true : result["wvEnabled"];
         if (enabled) {
             if (real) {
                 return true;
@@ -308,7 +308,7 @@ export class SettingsManager {
 
     static async getPREnabled(real) {
         const result = await AsyncSyncStorage.getStorage(["prEnabled"]);
-        const enabled = result["prEnabled"] === undefined ? false : result["prEnabled"];
+        const enabled = result["prEnabled"] === undefined ? true : result["prEnabled"];
         if (enabled) {
             if (real) {
                 return true;
