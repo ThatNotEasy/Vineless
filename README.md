@@ -19,13 +19,18 @@
 
 ## Installation
 + Chrome
-  1. Download the ZIP file of this repository
+  1. Download the ZIP file from the [releases section](https://github.com/Ingan121/Vineless/releases)
   2. Navigate to `chrome://extensions/`
   3. Enable `Developer mode`
   4. Drag-and-drop the downloaded file into the window
 + Firefox
+  + Persistent installation
+    1. Download the XPI file from the [releases section](https://github.com/Ingan121/Vineless/releases)
+    2. Navigate to `about:addons`
+    3. Click the settings icon and choose `Install Add-on From File...`
+    4. Select the downloaded file
   + Temporary installation
-    1. Download the ZIP file of this repository
+    1. Download the ZIP file from the [releases section](https://github.com/Ingan121/Vineless/releases)
     2. Navigate to `about:debugging#/runtime/this-firefox`
     3. Click `Load Temporary Add-on...` and select the downloaded file
 
