@@ -325,7 +325,6 @@ function hookKeySystem(interface) {
             Object.defineProperty(HTMLMediaElement.prototype, 'mediaKeys', {
                 get() {
                     const result = origMediaKeysGetter.call(this);
-                    console.log(result);
                     if (result?._emeShim?.origMediaKeys) {
                         console.log("[Vineless] Shimmed HTMLMediaElement.mediaKeys");
                         return result._emeShim.origMediaKeys;
