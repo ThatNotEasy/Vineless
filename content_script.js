@@ -189,7 +189,7 @@ function hookKeySystem(interface) {
     if (typeof origKeySystemGetter !== 'undefined') {
         Object.defineProperty(interface.prototype, 'keySystem', {
             get() {
-                if (this._emeShim) {
+                if (this._emeShim?.origKeySystem) {
                     console.log("[Vineless] Shimmed keySystem");
                     return this._emeShim.origKeySystem;
                 }
@@ -306,6 +306,9 @@ function hookKeySystem(interface) {
             if (keys._ckConfig) {
                 const ckAccess = await requestMediaKeySystemAccessUnaltered.call(navigator, 'org.w3.clearkey', [keys._ckConfig]);
                 keys._ckKeys = await ckAccess.createMediaKeys();
+                keys._ckKeys._emeShim = {
+                    origMediaKeys: keys
+                };
 
                 console.log("[Vineless] Replaced mediaKeys with ClearKey one");
 
@@ -314,6 +317,23 @@ function hookKeySystem(interface) {
 
             return _target.apply(_this, _args);
         });
+
+        const origMediaKeysDescriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'mediaKeys');
+        const origMediaKeysGetter = origMediaKeysDescriptor?.get;
+
+        if (typeof origMediaKeysGetter !== 'undefined') {
+            Object.defineProperty(HTMLMediaElement.prototype, 'mediaKeys', {
+                get() {
+                    const result = origMediaKeysGetter.call(this);
+                    console.log(result);
+                    if (result?._emeShim?.origMediaKeys) {
+                        console.log("[Vineless] Shimmed HTMLMediaElement.mediaKeys");
+                        return result._emeShim.origMediaKeys;
+                    }
+                    return result;
+                }
+            });
+        }
     }
 
     if (typeof MediaKeySystemAccess !== 'undefined') {

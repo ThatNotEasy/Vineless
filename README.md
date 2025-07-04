@@ -15,7 +15,6 @@
 + Works with any service that accepts challenges from Android devices on the same endpoint.
 + Incompatible services:
   + Netflix (unless ChromeCDM is provided, which is incredibly rare nowadays)
-  + Spotify (doesn't seem to accept Android CDMs. Also PlayReady endpoint is just broken)
 
 ## Installation
 + Chrome
