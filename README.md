@@ -15,6 +15,7 @@
 + Works with any service that accepts challenges from Android devices on the same endpoint.
 + Incompatible services:
   + Netflix (unless ChromeCDM is provided, which is incredibly rare nowadays)
++ Some services may detect your browser and interfere with PlayReady playback. Try using a user-agent changer extension, or use a Chromium-based browser for PlayReady playback.
 
 ## Installation
 + Chrome

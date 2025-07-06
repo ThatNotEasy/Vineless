@@ -8,8 +8,10 @@ import {
     base64toUint8Array,
     uint8ArrayToBase64,
     uint8ArrayToHex,
+    getWvPsshFromConcatPssh,
     SettingsManager,
-    AsyncLocalStorage, RemoteCDMManager,
+    AsyncLocalStorage,
+    RemoteCDMManager,
     PRDeviceManager
 } from "./util.js";
 import { WidevineDevice } from "./device.js";
@@ -77,7 +79,7 @@ async function parseClearKey(body, sendResponse, tab_url) {
 }
 
 async function generateChallenge(body, sendResponse) {
-    const pssh_data = body;
+    const pssh_data = getWvPsshFromConcatPssh(body);
 
     if (!pssh_data) {
         console.log("[Vineless]", "NO_PSSH_DATA_IN_CHALLENGE");
@@ -148,7 +150,7 @@ async function parseLicense(body, sendResponse, tab_url) {
 }
 
 async function generateChallengeRemote(body, sendResponse) {
-    const pssh_data = body;
+    const pssh_data = getWvPsshFromConcatPssh(body);
 
     if (!pssh_data) {
         console.log("[Vineless]", "NO_PSSH_DATA_IN_CHALLENGE");

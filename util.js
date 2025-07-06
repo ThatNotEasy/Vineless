@@ -501,3 +501,35 @@ export function stringToUint8Array(string) {
 export function stringToHex(string){
     return string.split("").map(c => c.charCodeAt(0).toString(16).padStart(2, "0")).join("");
 }
+
+// Some services send WV+PR concatenated PSSH to generateRequest
+export function getWvPsshFromConcatPssh(psshBase64) {
+    const raw = base64toUint8Array(psshBase64);
+
+    // Detect PlayReady PSSH by presence of "WRMHEADER" in UTF-16LE
+    const text = new TextDecoder('utf-16le').decode(raw);
+    if (!text.includes('WRMHEADER')) {
+        return psshBase64; // Keep as-is if PlayReady not mixed in
+    }
+
+    let offset = 0;
+    while (offset + 8 <= raw.length) {
+        const size = new DataView(raw.buffer, raw.byteOffset + offset).getUint32(0);
+        if (size === 0 || offset + size > raw.length) break;
+
+        const box = raw.slice(offset, offset + size);
+        const boxType = String.fromCharCode(...box.slice(4, 8));
+        const systemId = [...box.slice(12, 28)]
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+
+        if (boxType === 'pssh' && systemId === 'edef8ba979d64acea3c827dcd51d21ed') {
+            return uint8ArrayToBase64(box);
+        }
+
+        offset += size;
+    }
+
+    return psshBase64;
+}
+
