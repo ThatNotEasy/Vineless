@@ -129,14 +129,14 @@ prd_combobox.addEventListener('change', async function() {
 
 const prdRemove = document.getElementById('prdRemove');
 prdRemove.addEventListener('click', async function() {
-    await DeviceManager.removeSelectedPlayreadyDevice();
+    await PRDeviceManager.removeSelectedPlayreadyDevice();
     prd_combobox.innerHTML = '';
-    await DeviceManager.loadSetAllPlayreadyDevices();
+    await PRDeviceManager.loadSetAllPlayreadyDevices();
     const selected_option = prd_combobox.options[prd_combobox.selectedIndex];
     if (selected_option) {
-        await DeviceManager.saveSelectedPlayreadyDevice(selected_option.text);
+        await PRDeviceManager.saveSelectedPlayreadyDevice(selected_option.text);
     } else {
-        await DeviceManager.removeSelectedPlayreadyDeviceKey();
+        await PRDeviceManager.removeSelectedPlayreadyDeviceKey();
     }
 });
 

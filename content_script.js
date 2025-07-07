@@ -16,6 +16,10 @@ function compareUint8Arrays(arr1, arr2) {
     return Array.from(arr1).every((value, index) => value === arr2[index]);
 }
 
+function uint8ArrayToHex(buffer) {
+    return Array.prototype.map.call(buffer, x => x.toString(16).padStart(2, '0')).join('');
+}
+
 function base64ToBase64Url(b64) {
     return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
@@ -36,6 +40,8 @@ function hexToUint8Array(hex) {
     }
     return bytes;
 }
+
+const genRanHex = size => [...Array(size)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
 
 function generateClearKeyLicense(keys) {
     return JSON.stringify({
@@ -242,12 +248,12 @@ async function sanitizeConfigForClearKey(configOrConfigs) {
     return supportedConfigs;
 }
 
-function hookKeySystem(interface) {
-    const origKeySystemDescriptor = Object.getOwnPropertyDescriptor(interface.prototype, 'keySystem');
+function hookKeySystem(Interface) {
+    const origKeySystemDescriptor = Object.getOwnPropertyDescriptor(Interface.prototype, 'keySystem');
     const origKeySystemGetter = origKeySystemDescriptor?.get;
 
     if (typeof origKeySystemGetter !== 'undefined') {
-        Object.defineProperty(interface.prototype, 'keySystem', {
+        Object.defineProperty(Interface.prototype, 'keySystem', {
             get() {
                 if (this._emeShim?.origKeySystem) {
                     console.debug("[Vineless] Shimmed keySystem");
@@ -507,18 +513,31 @@ function flipUUIDByteOrder(u8arr) {
 
     if (typeof MediaKeySession !== 'undefined') {
         proxy(MediaKeySession.prototype, 'generateRequest', async (_target, _this, _args) => {
+            console.log("[Vineless] generateRequest", _this._ck ? "(Internal)" : "", _args, _this.sessionId);
             const keySystem = _this._mediaKeys?._emeShim?.origKeySystem;
             if (!await getEnabledForKeySystem(keySystem) || _this._ck) {
                 return await _target.apply(_this, _args);
             }
 
-            console.log("[Vineless] generateRequest", _args);
-
             try {
                 Object.defineProperty(_this, "sessionId", {
-                    value: "vl-" + Math.random().toString(36),
+                    value: genRanHex(32).toUpperCase(),
                     writable: false
                 });
+
+                if (_args[0].toLowerCase() === "webm") {
+                    throw "lookup not implemented"; // this somehow works better than my webm initData implementation for playback on specific site
+                    // that site calls update, and another "license-request" message is made, then update is called again. Prob the client id encryption stuff?
+                    _this._lookupOnly = true;
+                    const kid = uint8ArrayToHex(_args[1]);
+                    await emitAndWaitForResponse("REQUEST", `lookup:${_this.sessionId}:${kid}`);
+                    const evt = new MediaKeyMessageEvent("message", {
+                        message: new Uint8Array([0x08, 0x04]).buffer,
+                        messageType: "license-request"
+                    });
+                    _this.dispatchEvent(evt);
+                    return;
+                }
 
                 const base64Pssh = uint8ArrayToBase64(new Uint8Array(_args[1]));
                 const data = keySystem.startsWith("com.microsoft.playready") ? `pr:${_this.sessionId}:${base64Pssh}` : base64Pssh;
@@ -538,20 +557,22 @@ function flipUUIDByteOrder(u8arr) {
             return;
         });
         proxy(MediaKeySession.prototype, 'update', async (_target, _this, _args) => {
+            console.log("[Vineless] update", _this._ck ? "(Internal)" : "", _args, _this.sessionId);
             const keySystem = _this._mediaKeys?._emeShim?.origKeySystem;
             if (!await getEnabledForKeySystem(keySystem) || _this._ck) {
                 return await _target.apply(_this, _args);
             }
 
             const [response] = _args;
-            console.log("[Vineless] update");
             const base64Response = uint8ArrayToBase64(new Uint8Array(response));
-            const data = keySystem.startsWith("com.microsoft.playready") ? `pr:${_this.sessionId}:${base64Response}` : base64Response;
+            const isPlayReady = keySystem.startsWith("com.microsoft.playready");
+            const data = _this._lookupOnly ? `lookup:${_this.sessionId}` :
+                (isPlayReady ? `pr:${_this.sessionId}:${base64Response}` : base64Response);
             const bgResponse = await emitAndWaitForResponse("RESPONSE", data);
 
             try {
                 const parsed = JSON.parse(bgResponse);
-                console.log(parsed, _this);
+                console.log("[Vineless] Receieved keys from the background script:", parsed, _this);
                 if (parsed && _this._mediaKeys) {
                     if (!_this._mediaKeys._ckKeys) {
                         const ckAccess = await requestMediaKeySystemAccessUnaltered.call(navigator, 'org.w3.clearkey', [_this._mediaKeys._ckConfig]);
@@ -580,17 +601,22 @@ function flipUUIDByteOrder(u8arr) {
                     const keyStatuses = new Map();
                     const addedKeys = new Set();
                     for (const { kid } of parsed.keys) {
-                        // Some require unflipped one, others require flipped one
+                        // Some require unflipped one, others (PR only) require flipped one
                         // So include both unless duplicate
                         const raw = hexToUint8Array(kid);
-                        const flipped = flipUUIDByteOrder(raw);
+                        if (isPlayReady) {
+                            const flipped = flipUUIDByteOrder(raw);
 
-                        for (const keyBytes of [raw, flipped]) {
-                            const keyHex = Array.from(keyBytes).map(b => b.toString(16).padStart(2, '0')).join('');
-                            if (!addedKeys.has(keyHex)) {
-                                keyStatuses.set(keyBytes, "usable");
-                                addedKeys.add(keyHex);
+                            for (const keyBytes of [raw, flipped]) {
+                                const keyHex = Array.from(keyBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+                                if (!addedKeys.has(keyHex)) {
+                                    keyStatuses.set(keyBytes, "usable");
+                                    addedKeys.add(keyHex);
+                                }
                             }
+                        } else {
+                            // Some services hate having extra keys on Widevine
+                            keyStatuses.set(raw, "usable");
                         }
                     }
 
@@ -601,6 +627,7 @@ function flipUUIDByteOrder(u8arr) {
 
                     const keyStatusEvent = new Event("keystatuseschange");
                     _this.dispatchEvent(keyStatusEvent);
+                    console.log(keyStatuses);
 
                     return;
                 } else {
@@ -614,6 +641,7 @@ function flipUUIDByteOrder(u8arr) {
             return await _target.apply(_this, _args);
         });
         proxy(MediaKeySession.prototype, 'close', async (_target, _this, _args) => {
+            console.log("[Vineless] close");
             const keySystem = _this?._mediaKeys?._emeShim?.origKeySystem;
 
             // Mark closed

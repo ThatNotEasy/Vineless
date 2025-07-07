@@ -44,7 +44,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                         acc[item.name] = item.value;
                         return acc;
                     }, {});
-                console.log(headers);
+                console.debug(headers);
                 requests.set(details.url, headers);
             }
         }
@@ -330,6 +330,7 @@ async function parsePRLicense(decodedLicense, sendResponse, sessionId, tab_url) 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (async () => {
         const tab_url = sender.tab ? sender.tab.url : null;
+        console.log(message.type, message.body);
 
         switch (message.type) {
             case "REQUEST":
@@ -345,7 +346,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     return;
                 } catch {
                     if (message.body) {
-                        if (message.body.startsWith("pr:")) {
+                        if (message.body.startsWith("lookup:")) {
+                            const split = message.body.split(":");
+                            sessions.set(split[1], split[2]);
+                            sendResponse();
+                        } else if (message.body.startsWith("pr:")) {
                             if (!await SettingsManager.getPREnabled()) {
                                 sendResponse();
                                 manifests.clear();
@@ -384,7 +389,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     await parseClearKey(message.body, sendResponse, tab_url);
                     return;
                 } catch (e) {
-                    if (message.body.startsWith("pr:")) {
+                    if (message.body.startsWith("lookup:")) {
+                        const split = message.body.split(':');
+                        const sessionId = split[1];
+                        const kidHex = sessions.get(sessionId);
+
+                        if (!kidHex) {
+                            console.warn("[Vineless] Lookup failed: no session mapping for", sessionId);
+                            sendResponse();
+                            return;
+                        }
+
+                        // Find first log that contains the requested KID
+                        const log = logs.find(log =>
+                            log.keys.some(k => k.kid.toLowerCase() === kidHex.toLowerCase())
+                        );
+
+                        if (!log) {
+                            console.warn("[Vineless] Lookup failed: no log found for KID", kidHex);
+                            sendResponse();
+                            return;
+                        }
+
+                        const response = {
+                            keys: log.keys.map(k => ({
+                                k: k.k,
+                                kid: k.kid
+                            }))
+                        };
+
+                        sendResponse(JSON.stringify(response));
+                        return;
+                    } else if (message.body.startsWith("pr:")) {
                         if (!await SettingsManager.getPREnabled()) {
                             sendResponse();
                             manifests.clear();
