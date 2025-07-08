@@ -188,7 +188,7 @@ export class PRDeviceManager {
     }
 
     static async removeSelectedPlayreadyDevice() {
-        const selected_device_name = await DeviceManager.getSelectedPlayreadyDevice();
+        const selected_device_name = await PRDeviceManager.getSelectedPlayreadyDevice();
 
         const result = await AsyncSyncStorage.getStorage(['prDevices']);
         const array = result.prDevices === undefined ? [] : result.prDevices;
