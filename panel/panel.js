@@ -4,11 +4,13 @@ import { Utils } from '../jsplayready/utils.js';
 import {AsyncLocalStorage, base64toUint8Array, stringToUint8Array, DeviceManager, RemoteCDMManager, PRDeviceManager, SettingsManager} from "../util.js";
 
 const key_container = document.getElementById('key-container');
+const icon = document.getElementById('icon');
 
 // ================ Main ================
 const enabled = document.getElementById('enabled');
 enabled.addEventListener('change', async function (){
     await SettingsManager.setEnabled(enabled.checked);
+    icon.src = `../images/icon${enabled.checked ? '' : '-disabled'}.png`;
 });
 
 const toggle = document.getElementById('darkModeToggle');
@@ -16,6 +18,9 @@ toggle.addEventListener('change', async () => {
     SettingsManager.setDarkMode(toggle.checked);
     await SettingsManager.saveDarkMode(toggle.checked);
 });
+
+const version = document.getElementById('version');
+version.textContent = "v" + chrome.runtime.getManifest().version;
 
 const wvEnabled = document.getElementById('wvEnabled');
 wvEnabled.addEventListener('change', async function (){
@@ -276,6 +281,9 @@ function checkLogs() {
 
 document.addEventListener('DOMContentLoaded', async function () {
     enabled.checked = await SettingsManager.getEnabled();
+    if (!enabled.checked) {
+        icon.src = "../images/icon-disabled.png";
+    }
     SettingsManager.setDarkMode(await SettingsManager.getDarkMode());
     wvEnabled.checked = await SettingsManager.getWVEnabled(true);
     prEnabled.checked = await SettingsManager.getPREnabled(true);

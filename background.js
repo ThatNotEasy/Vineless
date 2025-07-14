@@ -9,6 +9,8 @@ import {
     uint8ArrayToBase64,
     uint8ArrayToHex,
     getWvPsshFromConcatPssh,
+    makeCkInitData,
+    setIcon,
     SettingsManager,
     AsyncLocalStorage,
     RemoteCDMManager,
@@ -27,6 +29,7 @@ import { utils } from "./jsplayready/noble-curves.min.js";
 let manifests = new Map();
 let requests = new Map();
 let sessions = new Map();
+let sessionCnt = {};
 let logs = [];
 
 chrome.webRequest.onBeforeSendHeaders.addListener(
@@ -340,6 +343,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     return;
                 }
 
+                if (!sessionCnt[sender.tab.id]) {
+                    sessionCnt[sender.tab.id] = 1;
+                    setIcon("images/icon-active.png", sender.tab.id);
+                } else {
+                    sessionCnt[sender.tab.id]++;
+                }
+
                 try {
                     JSON.parse(atob(message.body));
                     sendResponse(message.body);
@@ -348,8 +358,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     if (message.body) {
                         if (message.body.startsWith("lookup:")) {
                             const split = message.body.split(":");
-                            sessions.set(split[1], split[2]);
-                            sendResponse();
+                            // Find first log that contains the requested KID
+                            const log = logs.find(log =>
+                                log.keys.some(k => k.kid.toLowerCase() === split[2].toLowerCase())
+                            );
+                            if (!log) {
+                                console.warn("[Vineless] Lookup failed: no log found for KID", kidHex);
+                                sendResponse();
+                                return;
+                            }
+                            switch (log.type) {
+                                case "CLEARKEY": // UNTESTED
+                                    const ckInitData = makeCkInitData(log.keys);
+                                    sendResponse(uint8ArrayToBase64(ckInitData));
+                                    break;
+                                case "WIDEVINE":
+                                    const device_type = await SettingsManager.getSelectedDeviceType();
+                                    switch (device_type) {
+                                        case "WVD":
+                                            await generateChallenge(log.pssh_data, sendResponse);
+                                            break;
+                                        case "REMOTE":
+                                            await generateChallengeRemote(log.pssh_data, sendResponse);
+                                            break;
+                                    }
+                                    break;
+                                case "PLAYREADY": // UNTESTED
+                                    await generatePRChallenge(log.pssh_data, sendResponse, split[1]);
+                                    break;
+                            }
                         } else if (message.body.startsWith("pr:")) {
                             if (!await SettingsManager.getPREnabled()) {
                                 sendResponse();
@@ -389,38 +426,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     await parseClearKey(message.body, sendResponse, tab_url);
                     return;
                 } catch (e) {
-                    if (message.body.startsWith("lookup:")) {
-                        const split = message.body.split(':');
-                        const sessionId = split[1];
-                        const kidHex = sessions.get(sessionId);
-
-                        if (!kidHex) {
-                            console.warn("[Vineless] Lookup failed: no session mapping for", sessionId);
-                            sendResponse();
-                            return;
-                        }
-
-                        // Find first log that contains the requested KID
-                        const log = logs.find(log =>
-                            log.keys.some(k => k.kid.toLowerCase() === kidHex.toLowerCase())
-                        );
-
-                        if (!log) {
-                            console.warn("[Vineless] Lookup failed: no log found for KID", kidHex);
-                            sendResponse();
-                            return;
-                        }
-
-                        const response = {
-                            keys: log.keys.map(k => ({
-                                k: k.k,
-                                kid: k.kid
-                            }))
-                        };
-
-                        sendResponse(JSON.stringify(response));
-                        return;
-                    } else if (message.body.startsWith("pr:")) {
+                    if (message.body.startsWith("pr:")) {
                         if (!await SettingsManager.getPREnabled()) {
                             sendResponse();
                             manifests.clear();
@@ -447,6 +453,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     }
                     return;
                 }
+            case "CLOSE":
+                if (sessionCnt[sender.tab.id]) {
+                    if (--sessionCnt[sender.tab.id] === 0) {
+                        setIcon("images/icon.png", sender.tab.id);
+                    }
+                }
+                break;
             case "GET_ENABLED":
                 if (await SettingsManager.getEnabled()) {
                     sendResponse(JSON.stringify({
@@ -510,3 +523,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })();
     return true;
 });
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+    delete sessionCnt[tabId];
+});
+
+(async () => {
+    if (!await SettingsManager.getEnabled()) {
+        setIcon("images/icon-disabled.png");
+    }
+})();

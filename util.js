@@ -275,6 +275,7 @@ export class RemoteCDMManager {
 export class SettingsManager {
     static async setEnabled(enabled) {
         await AsyncSyncStorage.setStorage({ enabled: enabled });
+        setIcon(`images/icon${enabled ? '' : '-disabled'}.png`);
     }
 
     static async getEnabled() {
@@ -533,3 +534,74 @@ export function getWvPsshFromConcatPssh(psshBase64) {
     return psshBase64;
 }
 
+export function makeCkInitData(keys) {
+    const systemId = new Uint8Array([
+        0x10, 0x77, 0xef, 0xec,
+        0xc0, 0xb2,
+        0x4d, 0x02,
+        0xac, 0xe3,
+        0x3c, 0x1e, 0x52, 0xe2, 0xfb, 0x4b
+    ]);
+
+    const kidCount = keys.length;
+    const kidDataLength = kidCount * 16;
+    const dataSize = 0;
+
+    const size = 4 + 4 + 4 + 16 + 4 + kidDataLength + 4 + dataSize;
+    const buffer = new ArrayBuffer(size);
+    const view = new DataView(buffer);
+
+    let offset = 0;
+
+    view.setUint32(offset, size); offset += 4;
+    view.setUint32(offset, 0x70737368); offset += 4; // 'pssh'
+    view.setUint8(offset++, 0x01); // version 1
+    view.setUint8(offset++, 0x00); // flags (3 bytes)
+    view.setUint8(offset++, 0x00);
+    view.setUint8(offset++, 0x00);
+
+    new Uint8Array(buffer, offset, 16).set(systemId); offset += 16;
+
+    view.setUint32(offset, kidCount); offset += 4;
+
+    for (const key of keys) {
+        const kidBytes = hexToUint8Array(key.kid);
+        if (kidBytes.length !== 16) throw new Error("Invalid KID length");
+        new Uint8Array(buffer, offset, 16).set(kidBytes);
+        offset += 16;
+    }
+
+    view.setUint32(offset, dataSize); offset += 4;
+
+    return new Uint8Array(buffer);
+}
+
+export async function setIcon(filename, tabId = undefined) {
+    const isMV3 = typeof chrome.action !== "undefined";
+    if (!isMV3) {
+        chrome.browserAction.setIcon({
+            path: {
+                128: filename
+            },
+            tabId
+        });
+        return;
+    }
+
+    const url = chrome.runtime.getURL(filename);
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const bitmap = await createImageBitmap(blob);
+
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(bitmap, 0, 0);
+    const imageData = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+
+    chrome.action.setIcon({
+        imageData: {
+            [bitmap.width]: imageData
+        },
+        ...(tabId ? { tabId } : {})
+    });
+}
