@@ -9,7 +9,6 @@ import {
     uint8ArrayToBase64,
     uint8ArrayToHex,
     getWvPsshFromConcatPssh,
-    makeCkInitData,
     setIcon,
     SettingsManager,
     AsyncLocalStorage,
@@ -369,8 +368,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                             }
                             switch (log.type) {
                                 case "CLEARKEY": // UNTESTED
-                                    const ckInitData = makeCkInitData(log.keys);
-                                    sendResponse(uint8ArrayToBase64(ckInitData));
+                                    const json = JSON.stringify({
+                                        kids: log.keys.map(key => key.kid),
+                                        type: "temporary"
+                                    });
+                                    sendResponse(btoa(json));
                                     break;
                                 case "WIDEVINE":
                                     const device_type = await SettingsManager.getSelectedDeviceType();
