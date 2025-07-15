@@ -1,4 +1,25 @@
 (function () {
+    // Logging workaround for some stupid sites
+    const consoleUnaltered = globalThis.console;
+    const consoleLogUnaltered = consoleUnaltered.log;
+    const consoleDebugUnaltered = consoleUnaltered.debug;
+    const consoleErrorUnaltered = consoleUnaltered.error;
+    const consoleWarnUnaltered = consoleUnaltered.warn;
+    class console {
+        static log(...args) {
+            consoleLogUnaltered.apply(consoleUnaltered, args);
+        }
+        static debug(...args) {
+            consoleDebugUnaltered.apply(consoleUnaltered, args);
+        }
+        static error(...args) {
+            consoleErrorUnaltered.apply(consoleUnaltered, args);
+        }
+        static warn(...args) {
+            consoleWarnUnaltered.apply(consoleUnaltered, args);
+        }
+    }
+
     function uint8ArrayToBase64(uint8array) {
         return btoa(String.fromCharCode.apply(null, uint8array));
     }
@@ -261,14 +282,14 @@
         if (!enabledData) {
             return false;
         }
-        if (keySystem.startsWith( "com.widevine.alpha")) {
+        if (keySystem.startsWith("com.widevine.alpha")) {
             return enabledData.wv;
         } else if (keySystem.startsWith("com.microsoft.playready")) {
             return enabledData.pr;
         } else if (keySystem === "org.w3.clearkey") {
             return includeClearKey;
         }
-        console.error("[Vineless] Unsupported keySystem!");
+        console.error("[Vineless] Unsupported keySystem:", keySystem);
         return false;
     }
 
@@ -293,17 +314,22 @@
         if (typeof Navigator !== 'undefined') {
             proxy(Navigator.prototype, 'requestMediaKeySystemAccess', async (_target, _this, _args) => {
                 console.log("[Vineless] requestMediaKeySystemAccess", structuredClone(_args));
-                const origKeySystem = _args[0];
-                if (await getEnabledForKeySystem(origKeySystem, false)) {
-                    _args[0] = "org.w3.clearkey";
-                    _args[1] = await sanitizeConfigForClearKey(_args[1]);
+                try {
+                    const origKeySystem = _args[0];
+                    if (await getEnabledForKeySystem(origKeySystem, false)) {
+                        _args[0] = "org.w3.clearkey";
+                        _args[1] = await sanitizeConfigForClearKey(_args[1]);
+                    }
+                    const systemAccess = await _target.apply(_this, _args);
+                    systemAccess._emeShim = {
+                        origKeySystem
+                    };
+                    console.debug("[Vineless] requestMediaKeySystemAccess SUCCESS", systemAccess);
+                    return systemAccess;
+                } catch (e) {
+                    console.error("[Vineless] requestMediaKeySystemAccess FAILED", e);
+                    throw e;
                 }
-                const systemAccess = await _target.apply(_this, _args);
-                systemAccess._emeShim = {
-                    origKeySystem
-                };
-                console.debug("[Vineless] requestMediaKeySystemAccess SUCCESS", systemAccess);
-                return systemAccess;
             });
         }
 
@@ -495,13 +521,21 @@
 
                 return session;
             });
+            proxy(MediaKeys.prototype, 'setServerCertificate', (_target, _this, _args) => {
+                console.log("[Vineless] setServerCertificate", _args);
+                // Server certificates are not supported yet
+                // Chrome returns false when this is called on a CK MediaKeys, while Firefox raises an exception when done so
+                // Let's just return false for now to prevent some sites from entirely breaking
+                // Server certificate support is planned for the future, for services that truly need it for playback/higher quality content
+                return false;
+            });
 
             hookKeySystem(MediaKeys);
         }
 
         if (typeof MediaKeySession !== 'undefined') {
             proxy(MediaKeySession.prototype, 'generateRequest', async (_target, _this, _args) => {
-                console.log("[Vineless] generateRequest", _this._ck ? "(Internal)" : "", _args, _this.sessionId);
+                console.log("[Vineless] generateRequest " + (_this._ck ? "(Internal)" : ""), _args, "sessionId:", _this.sessionId);
                 const keySystem = _this._mediaKeys?._emeShim?.origKeySystem;
                 if (!await getEnabledForKeySystem(keySystem) || _this._ck) {
                     return await _target.apply(_this, _args);
@@ -542,7 +576,7 @@
                 return;
             });
             proxy(MediaKeySession.prototype, 'update', async (_target, _this, _args) => {
-                console.log("[Vineless] update", _this._ck ? "(Internal)" : "", _args, "sessionId:", _this.sessionId);
+                console.log("[Vineless] update " + (_this._ck ? "(Internal)" : ""), _args, "sessionId:", _this.sessionId);
                 const keySystem = _this._mediaKeys?._emeShim?.origKeySystem;
                 if (!await getEnabledForKeySystem(keySystem) || _this._ck) {
                     !_this._ck && _this.addEventListener('keystatuseschange', () => {

@@ -524,6 +524,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
 });
 
+chrome.webNavigation.onCommitted.addListener((details) => {
+    if (details.frameId === 0) { // main frame only
+        delete sessionCnt[details.tabId];
+    }
+});
+
 chrome.tabs.onRemoved.addListener((tabId) => {
     delete sessionCnt[tabId];
 });

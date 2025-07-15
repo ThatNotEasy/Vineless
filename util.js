@@ -583,7 +583,7 @@ export async function setIcon(filename, tabId = undefined) {
             path: {
                 128: filename
             },
-            tabId
+            ...(tabId ? { tabId } : {})
         });
         return;
     }
