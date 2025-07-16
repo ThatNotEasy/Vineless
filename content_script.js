@@ -504,7 +504,8 @@
 
         if (typeof MediaKeys !== 'undefined') {
             proxy(MediaKeys.prototype, 'createSession', (_target, _this, _args) => {
-                console.log("[Vineless] createSession");
+                const isInternal = !_this._emeShim?.origKeySystem;
+                console[isInternal ? "debug" : "log"]("[Vineless] createSession" + (isInternal ? " (Internal)" : ""));
                 const session = _target.apply(_this, _args);
                 session._mediaKeys = _this;
 
@@ -535,7 +536,7 @@
 
         if (typeof MediaKeySession !== 'undefined') {
             proxy(MediaKeySession.prototype, 'generateRequest', async (_target, _this, _args) => {
-                console.log("[Vineless] generateRequest " + (_this._ck ? "(Internal)" : ""), _args, "sessionId:", _this.sessionId);
+                console[_this._ck ? "debug" : "log"]("[Vineless] generateRequest" + (_this._ck ? " (Internal)" : ""), _args, "sessionId:", _this.sessionId);
                 const keySystem = _this._mediaKeys?._emeShim?.origKeySystem;
                 if (!await getEnabledForKeySystem(keySystem) || _this._ck) {
                     return await _target.apply(_this, _args);
@@ -568,6 +569,7 @@
                         messageType: "license-request"
                     });
                     _this.dispatchEvent(evt);
+                    console.debug("[Vineless] generateRequest SUCCESS");
                 } catch (e) {
                     console.error("[Vineless] generateRequest FAILED,", e);
                     throw e;
@@ -576,7 +578,7 @@
                 return;
             });
             proxy(MediaKeySession.prototype, 'update', async (_target, _this, _args) => {
-                console.log("[Vineless] update " + (_this._ck ? "(Internal)" : ""), _args, "sessionId:", _this.sessionId);
+                console[_this._ck ? "debug" : "log"]("[Vineless] update" + (_this._ck ? " (Internal)" : ""), _args, "sessionId:", _this.sessionId);
                 const keySystem = _this._mediaKeys?._emeShim?.origKeySystem;
                 if (!await getEnabledForKeySystem(keySystem) || _this._ck) {
                     !_this._ck && _this.addEventListener('keystatuseschange', () => {
@@ -653,6 +655,7 @@
                         const keyStatusEvent = new Event("keystatuseschange");
                         _this.dispatchEvent(keyStatusEvent);
 
+                        console.debug("[Vineless] update SUCCESS, keyStatuses:", keyStatuses);
                         return;
                     } else {
                         console.error("[Vineless] update FAILED, no MediaKeys available!");
