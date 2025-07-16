@@ -522,8 +522,12 @@
 
                 return session;
             });
-            proxy(MediaKeys.prototype, 'setServerCertificate', (_target, _this, _args) => {
-                console.log("[Vineless] setServerCertificate", _args);
+            proxy(MediaKeys.prototype, 'setServerCertificate', async (_target, _this, _args) => {
+                console.log("[Vineless] setServerCertificate", _args[0]);
+                const keySystem = _this._emeShim?.origKeySystem;
+                if (!await getEnabledForKeySystem(keySystem) || _this._ck) {
+                    return await _target.apply(_this, _args);
+                }
                 // Server certificates are not supported yet
                 // Chrome returns false when this is called on a CK MediaKeys, while Firefox raises an exception when done so
                 // Let's just return false for now to prevent some sites from entirely breaking
