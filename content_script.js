@@ -504,7 +504,7 @@
 
         if (typeof MediaKeys !== 'undefined') {
             proxy(MediaKeys.prototype, 'createSession', (_target, _this, _args) => {
-                const isInternal = !_this._emeShim?.origKeySystem;
+                const isInternal = _this._emeShim?.origMediaKeys;
                 console[isInternal ? "debug" : "log"]("[Vineless] createSession" + (isInternal ? " (Internal)" : ""));
                 const session = _target.apply(_this, _args);
                 session._mediaKeys = _this;
