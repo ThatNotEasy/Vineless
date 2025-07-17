@@ -316,6 +316,7 @@
                 console.log("[Vineless] requestMediaKeySystemAccess", structuredClone(_args));
                 try {
                     const origKeySystem = _args[0];
+                    const origConfig = structuredClone(_args[1]);
                     if (await getEnabledForKeySystem(origKeySystem, false)) {
                         _args[0] = "org.w3.clearkey";
                         _args[1] = await sanitizeConfigForClearKey(_args[1]);
@@ -323,6 +324,11 @@
                     const systemAccess = await _target.apply(_this, _args);
                     systemAccess._emeShim = {
                         origKeySystem
+                    };
+                    systemAccess._getRealConfiguration = systemAccess.getConfiguration;
+                    systemAccess.getConfiguration = function () {
+                        console.debug("[Vineless] Shimmed MediaKeySystemAccess.getConfiguration");
+                        return origConfig[0];
                     };
                     console.debug("[Vineless] requestMediaKeySystemAccess SUCCESS", systemAccess);
                     return systemAccess;
@@ -492,7 +498,7 @@
 
                 const realKeys = _target.apply(_this, _args);
                 realKeys.then(res => {
-                    res._ckConfig = _this.getConfiguration();
+                    res._ckConfig = _this._getRealConfiguration();
                     res._emeShim = _this._emeShim;
                 });
 
@@ -677,7 +683,7 @@
 
                 // Mark closed
                 if (_this._closeResolver) {
-                    _this._closeResolver();
+                    _this._closeResolver({result: "closed-by-application"});
                 }
 
                 if (!await getEnabledForKeySystem(keySystem) || _this._ck) {

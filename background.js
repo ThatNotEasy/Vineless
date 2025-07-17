@@ -461,6 +461,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         setIcon("images/icon.png", sender.tab.id);
                     }
                 }
+                sendResponse();
                 break;
             case "GET_ENABLED":
                 if (await SettingsManager.getEnabled()) {
