@@ -317,19 +317,22 @@
                 try {
                     const origKeySystem = _args[0];
                     const origConfig = structuredClone(_args[1]);
-                    if (await getEnabledForKeySystem(origKeySystem, false)) {
+                    const enabled = await getEnabledForKeySystem(origKeySystem);
+                    if (enabled && origKeySystem !== "org.w3.clearkey") {
                         _args[0] = "org.w3.clearkey";
                         _args[1] = await sanitizeConfigForClearKey(_args[1]);
                     }
                     const systemAccess = await _target.apply(_this, _args);
-                    systemAccess._emeShim = {
-                        origKeySystem
-                    };
-                    systemAccess._getRealConfiguration = systemAccess.getConfiguration;
-                    systemAccess.getConfiguration = function () {
-                        console.debug("[Vineless] Shimmed MediaKeySystemAccess.getConfiguration");
-                        return origConfig[0];
-                    };
+                    if (enabled) {
+                        systemAccess._emeShim = {
+                            origKeySystem
+                        };
+                        systemAccess._getRealConfiguration = systemAccess.getConfiguration;
+                        systemAccess.getConfiguration = function () {
+                            console.debug("[Vineless] Shimmed MediaKeySystemAccess.getConfiguration");
+                            return origConfig[0];
+                        };
+                    }
                     console.debug("[Vineless] requestMediaKeySystemAccess SUCCESS", systemAccess);
                     return systemAccess;
                 } catch (e) {
@@ -410,16 +413,14 @@
 
                         const ckResult = await _target.call(_this, ckConfig);
 
-                        // Generate a real MediaKeySystemAccess to attach
                         const access = await requestMediaKeySystemAccessUnaltered.call(navigator, "org.w3.clearkey", [ckConfig.keySystemConfiguration]);
 
-                        // Shim .keySystem
                         access._emeShim = { origKeySystem };
+                        access._getRealConfiguration = access.getConfiguration;
 
-                        // Also patch `getConfiguration()` to reflect original input
-                        const originalGetConfig = access.getConfiguration.bind(access);
+                        // Patch `getConfiguration()` to reflect original input
                         access.getConfiguration = () => ({
-                            ...originalGetConfig(),
+                            ...access._getRealConfiguration(),
                             videoCapabilities: ckConfig.keySystemConfiguration.videoCapabilities,
                             audioCapabilities: ckConfig.keySystemConfiguration.audioCapabilities,
                             sessionTypes: ckConfig.keySystemConfiguration.sessionTypes,
@@ -498,7 +499,7 @@
 
                 const realKeys = _target.apply(_this, _args);
                 realKeys.then(res => {
-                    res._ckConfig = _this._getRealConfiguration();
+                    res._ckConfig = (_this._getRealConfiguration || _this.getConfiguration).call(_this);
                     res._emeShim = _this._emeShim;
                 });
 
