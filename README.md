@@ -18,8 +18,8 @@
 + Some services may detect your browser and interfere with PlayReady playback. Try using a user-agent changer extension, or use a Chromium-based browser for PlayReady playback.
 + Incompatible extensions:
   + WidevineProxy2, or anything similar
-  + PlayReadyProxy2, or anything similar
-  + EME Logger (extension, not the userscript)
+  + PlayreadyProxy2, or anything similar
+  + EME Call and Event Logger (extension, not the userscript)
   + For Vineless to work, these extensions must be fully disabled in the browser's extensions page
 
 ## Installation
@@ -55,7 +55,7 @@ All the user has to do is to play a DRM protected video. With everything set up 
 * First, check if the service accepts your device (CDM).
   * For Widevine, use either [WidevineProxy2](https://github.com/DevLARLEY/WidevineProxy2) or [openwv](https://github.com/tchebb/openwv) with the same WVD file.
   * For PlayReady, use [PlayreadyProxy2](https://github.com/DevLARLEY/PlayreadyProxy2/) with the same PRD file.
-  * Do note that WidevineProxy2 and PlayreadyProxy2 do not support playback, so just test if you can acquire the keys with them.
+  * Do note that WidevineProxy2 and PlayreadyProxy2 do not support playback, so just test if you can acquire the keys with them. Also, fully disable Vineless before testing those two.
 * If those aren't working as well, this automatically means that the license server is blocking your CDM and that you either need a CDM from a physical device, a ChromeCDM, or an L1 Android CDM. Don't ask where you can get these.
 * If those are working but Vineless isn't working, please report this on the issues page. Please include the DevTools console logs as well, and make sure the verbose/debug logs are enabled.
 
