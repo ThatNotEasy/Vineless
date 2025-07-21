@@ -507,12 +507,6 @@ export function stringToHex(string){
 export function getWvPsshFromConcatPssh(psshBase64) {
     const raw = base64toUint8Array(psshBase64);
 
-    // Detect PlayReady PSSH by presence of "WRMHEADER" in UTF-16LE
-    const text = new TextDecoder('utf-16le').decode(raw);
-    if (!text.includes('WRMHEADER')) {
-        return psshBase64; // Keep as-is if PlayReady not mixed in
-    }
-
     let offset = 0;
     while (offset + 8 <= raw.length) {
         const size = new DataView(raw.buffer, raw.byteOffset + offset).getUint32(0);

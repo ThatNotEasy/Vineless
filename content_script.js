@@ -535,10 +535,11 @@
                 if (!await getEnabledForKeySystem(keySystem) || _this._ck) {
                     return await _target.apply(_this, _args);
                 }
-                // Server certificates are not supported yet
-                // Chrome returns false when this is called on a CK MediaKeys, while Firefox raises an exception when done so
-                // Let's just return false for now to prevent some sites from entirely breaking
-                // Server certificate support is planned for the future, for services that truly need it for playback/higher quality content
+                if (keySystem.startsWith("com.widevine.alpha")) {
+                    _this._emeShim.serverCert = uint8ArrayToBase64(new Uint8Array(_args[0]));
+                    return true;
+                }
+                // Server certificates are not supported on ClearKey or PlayReady
                 return false;
             });
 
@@ -561,7 +562,16 @@
 
                     if (_args[0].toLowerCase() === "webm") {
                         const kid = uint8ArrayToHex(_args[1]);
-                        const base64Pssh = await emitAndWaitForResponse("REQUEST", `lookup:${_this.sessionId}:${kid}`);
+                        let data = `lookup:${_this.sessionId}:${kid}`;
+                        if (_this._mediaKeys._emeShim.serverCert) {
+                            data += `:${_this._mediaKeys._emeShim.serverCert}`;
+                        }
+                        const base64Pssh = await emitAndWaitForResponse("REQUEST", data);
+                        if (!base64Pssh) {
+                            const error = new Error("[Vineless] No PSSH received for WebM request");
+                            console.error(error);
+                            throw error;
+                        }
                         const evt = new MediaKeyMessageEvent("message", {
                             message: base64toUint8Array(base64Pssh).buffer,
                             messageType: "license-request"
@@ -571,7 +581,10 @@
                     }
 
                     const base64Pssh = uint8ArrayToBase64(new Uint8Array(_args[1]));
-                    const data = keySystem.startsWith("com.microsoft.playready") ? `pr:${_this.sessionId}:${base64Pssh}` : base64Pssh;
+                    let data = keySystem.startsWith("com.microsoft.playready") ? `pr:${_this.sessionId}:${base64Pssh}` : base64Pssh;
+                    if (_this._mediaKeys._emeShim.serverCert) {
+                        data += `:${_this._mediaKeys._emeShim.serverCert}`;
+                    }
                     const challenge = await emitAndWaitForResponse("REQUEST", data);
                     const challengeBytes = base64toUint8Array(challenge);
 

@@ -80,7 +80,7 @@ async function parseClearKey(body, sendResponse, tab_url) {
     sendResponse(JSON.stringify({pssh: pssh_data, keys : formatted_keys}));
 }
 
-async function generateChallenge(body, sendResponse) {
+async function generateChallenge(body, sendResponse, serverCert) {
     const pssh_data = getWvPsshFromConcatPssh(body);
 
     if (!pssh_data) {
@@ -106,6 +106,10 @@ async function generateChallenge(body, sendResponse) {
         },
         pssh_data
     );
+
+    if (serverCert) {
+        session.setServiceCertificate(base64toUint8Array(serverCert));
+    }
 
     const [challenge, request_id] = session.createLicenseRequest(LicenseType.STREAMING, widevine_device.type === 2);
     sessions.set(uint8ArrayToBase64(request_id), session);
@@ -355,11 +359,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     return;
                 } catch {
                     if (message.body) {
+                        const split = message.body.split(":");
                         if (message.body.startsWith("lookup:")) {
-                            const split = message.body.split(":");
+                            const [ _, sessionId, kidHex, serverCert ] = split;
                             // Find first log that contains the requested KID
                             const log = logs.find(log =>
-                                log.keys.some(k => k.kid.toLowerCase() === split[2].toLowerCase())
+                                log.keys.some(k => k.kid.toLowerCase() === kidHex.toLowerCase())
                             );
                             if (!log) {
                                 console.warn("[Vineless] Lookup failed: no log found for KID", kidHex);
@@ -378,7 +383,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                                     const device_type = await SettingsManager.getSelectedDeviceType();
                                     switch (device_type) {
                                         case "WVD":
-                                            await generateChallenge(log.pssh_data, sendResponse);
+                                            await generateChallenge(log.pssh_data, sendResponse, serverCert);
                                             break;
                                         case "REMOTE":
                                             await generateChallengeRemote(log.pssh_data, sendResponse);
@@ -386,7 +391,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                                     }
                                     break;
                                 case "PLAYREADY": // UNTESTED
-                                    await generatePRChallenge(log.pssh_data, sendResponse, split[1]);
+                                    await generatePRChallenge(log.pssh_data, sendResponse, sessionId);
                                     break;
                             }
                         } else if (message.body.startsWith("pr:")) {
@@ -395,21 +400,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                                 manifests.clear();
                                 return;
                             }
-                            const split = message.body.split(':');
-                            await generatePRChallenge(split[2], sendResponse, split[1]);
+                            const [ _, sessionId, wrmHeader ] = split;
+                            await generatePRChallenge(wrmHeader, sendResponse, sessionId);
                         } else {
                             if (!await SettingsManager.getWVEnabled()) {
                                 sendResponse();
                                 manifests.clear();
                                 return;
                             }
+                            const [ pssh, serverCert ] = split;
                             const device_type = await SettingsManager.getSelectedDeviceType();
                             switch (device_type) {
                                 case "WVD":
-                                    await generateChallenge(message.body, sendResponse);
+                                    await generateChallenge(pssh, sendResponse, serverCert);
                                     break;
                                 case "REMOTE":
-                                    await generateChallengeRemote(message.body, sendResponse);
+                                    await generateChallengeRemote(pssh, sendResponse); // No serverCert support for remote yet
                                     break;
                             }
                         }
