@@ -164,8 +164,6 @@ async function generateChallengeRemote(body, sendResponse) {
         return;
     }
 
-    const pssh = Session.psshDataToPsshBoxB64(pssh_data);
-
     const selected_remote_cdm_name = await RemoteCDMManager.getSelectedRemoteCDM();
     if (!selected_remote_cdm_name) {
         sendResponse(body);
@@ -176,14 +174,14 @@ async function generateChallengeRemote(body, sendResponse) {
     const remote_cdm = RemoteCdm.from_object(selected_remote_cdm);
 
     const session_id = await remote_cdm.open();
-    const challenge_b64 = await remote_cdm.get_license_challenge(session_id, pssh, true);
+    const challenge_b64 = await remote_cdm.get_license_challenge(session_id, pssh_data, true);
 
     const signed_challenge_message = SignedMessage.decode(base64toUint8Array(challenge_b64));
     const challenge_message = LicenseRequest.decode(signed_challenge_message.msg);
 
     sessions.set(uint8ArrayToBase64(challenge_message.contentId.widevinePsshData.requestId), {
         id: session_id,
-        pssh: pssh
+        pssh: pssh_data
     });
     sendResponse(challenge_b64);
 }
@@ -241,7 +239,7 @@ async function parseLicenseRemote(body, sendResponse, tab_url) {
     await AsyncLocalStorage.setStorage({[session_id.pssh]: log});
 
     sessions.delete(loaded_request_id);
-    sendResponse(JSON.stringify({pssh, keys}));
+    sendResponse(JSON.stringify({pssh: session_id.pssh, keys}));
 }
 
 async function generatePRChallenge(body, sendResponse, sessionId) {
