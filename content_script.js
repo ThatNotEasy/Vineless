@@ -1,22 +1,21 @@
 (function () {
     // Logging workaround for some stupid sites
-    const consoleUnaltered = globalThis.console;
-    const consoleLogUnaltered = consoleUnaltered.log;
-    const consoleDebugUnaltered = consoleUnaltered.debug;
-    const consoleErrorUnaltered = consoleUnaltered.error;
-    const consoleWarnUnaltered = consoleUnaltered.warn;
+    const consoleLogUnaltered = globalThis.console.log;
+    const consoleDebugUnaltered = globalThis.console.debug;
+    const consoleErrorUnaltered = globalThis.console.error;
+    const consoleWarnUnaltered = globalThis.console.warn;
     class console {
         static log(...args) {
-            consoleLogUnaltered.apply(consoleUnaltered, args);
+            consoleLogUnaltered(...args);
         }
         static debug(...args) {
-            consoleDebugUnaltered.apply(consoleUnaltered, args);
+            consoleDebugUnaltered(...args);
         }
         static error(...args) {
-            consoleErrorUnaltered.apply(consoleUnaltered, args);
+            consoleErrorUnaltered(...args);
         }
         static warn(...args) {
-            consoleWarnUnaltered.apply(consoleUnaltered, args);
+            consoleWarnUnaltered(...args);
         }
     }
 
@@ -274,25 +273,6 @@
         }
     }
 
-    async function getEnabledForKeySystem(keySystem, includeClearKey = true) {
-        if (!keySystem) {
-            return false;
-        }
-        const enabledData = JSON.parse(await emitAndWaitForResponse("GET_ENABLED"));
-        if (!enabledData) {
-            return false;
-        }
-        if (keySystem.startsWith("com.widevine.alpha")) {
-            return enabledData.wv;
-        } else if (keySystem.startsWith("com.microsoft.playready")) {
-            return enabledData.pr;
-        } else if (keySystem === "org.w3.clearkey") {
-            return includeClearKey;
-        }
-        console.error("[Vineless] Unsupported keySystem:", keySystem);
-        return false;
-    }
-
     function flipUUIDByteOrder(u8arr) {
         const out = new Uint8Array(16);
         out.set([
@@ -311,13 +291,43 @@
             return;
         }
 
+        const profileConfig = JSON.parse(await emitAndWaitForResponse("GET_PROFILE"));
+        //console.log(profileConfig)
+        if (!profileConfig.enabled) {
+            console.log("[Vineless] Vineless is disabled.");
+            return;
+        }
+
+        function getEnabledForKeySystem(keySystem, includeClearKey = true) {
+            if (!keySystem) {
+                return false;
+            }
+            if (!profileConfig.enabled) {
+                return false;
+            }
+            if (keySystem.startsWith("com.widevine.alpha")) {
+                return profileConfig.widevine.enabled;
+            } else if (keySystem.startsWith("com.microsoft.playready")) {
+                return profileConfig.playready.enabled;
+            } else if (keySystem === "org.w3.clearkey") {
+                return profileConfig.clearkey.enabled && includeClearKey;
+            }
+            console.error("[Vineless] Unsupported keySystem:", keySystem);
+            return false;
+        }
+
         if (typeof Navigator !== 'undefined') {
             proxy(Navigator.prototype, 'requestMediaKeySystemAccess', async (_target, _this, _args) => {
                 console.log("[Vineless] requestMediaKeySystemAccess", structuredClone(_args));
                 try {
                     const origKeySystem = _args[0];
                     const origConfig = structuredClone(_args[1]);
-                    const enabled = await getEnabledForKeySystem(origKeySystem);
+                    const enabled = getEnabledForKeySystem(origKeySystem);
+                    if (!enabled && profileConfig.blockDisabled) {
+                        console.warn("[Vineless] Blocked a non-Vineless enabled EME keySystem:", origKeySystem);
+                        _args[0] = "com.ingan121.vineless.invalid";
+                        await _target.apply(_this, _args); // should throw here
+                    }
                     if (enabled && origKeySystem !== "org.w3.clearkey") {
                         _args[0] = "org.w3.clearkey";
                         _args[1] = await sanitizeConfigForClearKey(_args[1]);
@@ -345,12 +355,12 @@
         if (typeof MediaCapabilities !== 'undefined') {
             proxy(MediaCapabilities.prototype, 'decodingInfo', async (_target, _this, _args) => {
                 const [config] = _args;
-                if (_args._ck) {
+                if (config._ck) {
                     return await _target.apply(_this, _args);
                 }
                 const origKeySystem = config?.keySystemConfiguration?.keySystem;
 
-                if (await getEnabledForKeySystem(origKeySystem, false)) {
+                if (getEnabledForKeySystem(origKeySystem, false)) {
                     console.log("[Vineless] Intercepted decodingInfo for", origKeySystem);
 
                     try {
@@ -443,6 +453,14 @@
                             keySystemAccess: null
                         };
                     }
+                } else if (origKeySystem && profileConfig.blockDisabled) {
+                    console.warn("[Vineless] Blocked a non-Vineless enabled EME keySystem:", origKeySystem);
+                    return {
+                        supported: false,
+                        smooth: false,
+                        powerEfficient: false,
+                        keySystemAccess: null
+                    };
                 }
 
                 return await _target.apply(_this, _args);
@@ -454,7 +472,7 @@
                 console.log("[Vineless] setMediaKeys", _args);
                 const keys = _args[0];
                 const keySystem = keys?._emeShim?.origKeySystem;
-                if (!await getEnabledForKeySystem(keySystem)) {
+                if (!getEnabledForKeySystem(keySystem)) {
                     return await _target.apply(_this, _args);
                 }
 
@@ -532,7 +550,7 @@
             proxy(MediaKeys.prototype, 'setServerCertificate', async (_target, _this, _args) => {
                 console.log("[Vineless] setServerCertificate", _args[0]);
                 const keySystem = _this._emeShim?.origKeySystem;
-                if (!await getEnabledForKeySystem(keySystem) || _this._ck) {
+                if (!getEnabledForKeySystem(keySystem) || _this._ck) {
                     return await _target.apply(_this, _args);
                 }
                 if (keySystem.startsWith("com.widevine.alpha")) {
@@ -550,7 +568,14 @@
             proxy(MediaKeySession.prototype, 'generateRequest', async (_target, _this, _args) => {
                 console[_this._ck ? "debug" : "log"]("[Vineless] generateRequest" + (_this._ck ? " (Internal)" : ""), _args, "sessionId:", _this.sessionId);
                 const keySystem = _this._mediaKeys?._emeShim?.origKeySystem;
-                if (!await getEnabledForKeySystem(keySystem) || _this._ck) {
+                if (!getEnabledForKeySystem(keySystem) || _this._ck) {
+                    return await _target.apply(_this, _args);
+                }
+
+                if (keySystem === "org.w3.clearkey") {
+                    // Not much processing is required for real ClearKey (only update() is important)
+                    // Just notify the background script about the playback (for the status icon) and go on
+                    await emitAndWaitForResponse("REQUEST");
                     return await _target.apply(_this, _args);
                 }
 
@@ -604,7 +629,7 @@
             proxy(MediaKeySession.prototype, 'update', async (_target, _this, _args) => {
                 console[_this._ck ? "debug" : "log"]("[Vineless] update" + (_this._ck ? " (Internal)" : ""), _args, "sessionId:", _this.sessionId);
                 const keySystem = _this._mediaKeys?._emeShim?.origKeySystem;
-                if (!await getEnabledForKeySystem(keySystem) || _this._ck) {
+                if (!getEnabledForKeySystem(keySystem) || _this._ck) {
                     !_this._ck && _this.addEventListener('keystatuseschange', () => {
                         const kidStasuses = {};
                         for (const [keyId, status] of _this.keyStatuses) {
@@ -700,7 +725,7 @@
                     _this._closeResolver({result: "closed-by-application"});
                 }
 
-                if (!await getEnabledForKeySystem(keySystem) || _this._ck) {
+                if (!getEnabledForKeySystem(keySystem) || _this._ck) {
                     return await _target.apply(_this, _args);
                 }
 

@@ -24,35 +24,39 @@ select {
 
 
 /* Dark mode */
-.dark-mode {
-    background-color: #1b1b1b;
-    color: #D5D5D5;
-}
-.dark-mode fieldset {
-    border-color: #535353;
-}
-.dark-mode button, .dark-mode select {
-    background-color: #222;
-    color: #D5D5D5;
-}
-.dark-mode button:hover, .dark-mode select:hover {
-    background-color: #323232;
-}
-.dark-mode .expandableDiv {
-    background-color: #1b2027;
-}
-.dark-mode .text-box {
-    background-color: #323232;
-    color: #D5D5D5;
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: #1b1b1b;
+        color: #D5D5D5;
+    }
+    fieldset {
+        border-color: #535353;
+    }
+    button, select {
+        background-color: #222;
+        color: #D5D5D5;
+    }
+    button:hover, select:hover {
+        background-color: #323232;
+    }
+    .expandableDiv {
+        background-color: #1b2027;
+    }
+    .text-box {
+        background-color: #323232;
+        color: #D5D5D5;
+    }
 }
 
 /* Switch */
+#scopeToggleArea {
+    margin-left: 10px;
+}
 .switch {
     position: relative;
     display: inline-block;
     width: 40px;
     height: 20px;
-    margin-left: 10px;
 }
 .switch input {
     opacity: 0;

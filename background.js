@@ -10,6 +10,7 @@ import {
     uint8ArrayToHex,
     getWvPsshFromConcatPssh,
     setIcon,
+    setBadgeText,
     SettingsManager,
     AsyncLocalStorage,
     RemoteCDMManager,
@@ -80,7 +81,7 @@ async function parseClearKey(body, sendResponse, tab_url) {
     sendResponse(JSON.stringify({pssh: pssh_data, keys : formatted_keys}));
 }
 
-async function generateChallenge(body, sendResponse, serverCert) {
+async function generateChallenge(host, body, sendResponse, serverCert) {
     const pssh_data = getWvPsshFromConcatPssh(body);
 
     if (!pssh_data) {
@@ -89,7 +90,7 @@ async function generateChallenge(body, sendResponse, serverCert) {
         return;
     }
 
-    const selected_device_name = await DeviceManager.getSelectedWidevineDevice();
+    const selected_device_name = await DeviceManager.getSelectedWidevineDevice(host);
     if (!selected_device_name) {
         sendResponse(body);
         return;
@@ -117,7 +118,7 @@ async function generateChallenge(body, sendResponse, serverCert) {
     sendResponse(uint8ArrayToBase64(challenge));
 }
 
-async function parseLicense(body, sendResponse, tab_url) {
+async function parseLicense(host, body, sendResponse, tab_url) {
     const license = base64toUint8Array(body);
     const signed_license_message = SignedMessage.decode(license);
 
@@ -155,7 +156,7 @@ async function parseLicense(body, sendResponse, tab_url) {
     sendResponse(JSON.stringify({pssh, keys}));
 }
 
-async function generateChallengeRemote(body, sendResponse) {
+async function generateChallengeRemote(host, body, sendResponse) {
     const pssh_data = getWvPsshFromConcatPssh(body);
 
     if (!pssh_data) {
@@ -164,7 +165,7 @@ async function generateChallengeRemote(body, sendResponse) {
         return;
     }
 
-    const selected_remote_cdm_name = await RemoteCDMManager.getSelectedRemoteCDM();
+    const selected_remote_cdm_name = await RemoteCDMManager.getSelectedRemoteCDM(host);
     if (!selected_remote_cdm_name) {
         sendResponse(body);
         return;
@@ -186,7 +187,7 @@ async function generateChallengeRemote(body, sendResponse) {
     sendResponse(challenge_b64);
 }
 
-async function parseLicenseRemote(body, sendResponse, tab_url) {
+async function parseLicenseRemote(host, body, sendResponse, tab_url) {
     const license = base64toUint8Array(body);
     const signed_license_message = SignedMessage.decode(license);
 
@@ -206,7 +207,7 @@ async function parseLicenseRemote(body, sendResponse, tab_url) {
 
     const session_id = sessions.get(loaded_request_id);
 
-    const selected_remote_cdm_name = await RemoteCDMManager.getSelectedRemoteCDM();
+    const selected_remote_cdm_name = await RemoteCDMManager.getSelectedRemoteCDM(host);
     if (!selected_remote_cdm_name) {
         sendResponse(body);
         return;
@@ -242,8 +243,8 @@ async function parseLicenseRemote(body, sendResponse, tab_url) {
     sendResponse(JSON.stringify({pssh: session_id.pssh, keys}));
 }
 
-async function generatePRChallenge(body, sendResponse, sessionId) {
-    const selected_device_name = await PRDeviceManager.getSelectedPlayreadyDevice();
+async function generatePRChallenge(host, body, sendResponse, sessionId) {
+    const selected_device_name = await PRDeviceManager.getSelectedPlayreadyDevice(host);
     if (!selected_device_name) {
         sendResponse(body);
         return;
@@ -295,13 +296,13 @@ async function generatePRChallenge(body, sendResponse, sessionId) {
     sendResponse(uint8ArrayToBase64(newKeyMessage));
 }
 
-async function parsePRLicense(decodedLicense, sendResponse, sessionId, tab_url) {
+async function parsePRLicense(host, decodedLicense, sendResponse, sessionId, tab_url) {
     if (!sessions.has(sessionId)) {
         sendResponse(btoa(decodedLicense));
         return;
     }
 
-    const selected_device_name = await PRDeviceManager.getSelectedPlayreadyDevice();
+    const selected_device_name = await PRDeviceManager.getSelectedPlayreadyDevice(host);
     if (!selected_device_name) {
         sendResponse(btoa(decodedLicense));
         return;
@@ -334,11 +335,14 @@ async function parsePRLicense(decodedLicense, sendResponse, sessionId, tab_url) 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (async () => {
         const tab_url = sender.tab ? sender.tab.url : null;
+        const host = tab_url ? new URL(tab_url).host : null;
         console.log(message.type, message.body);
+
+        const profileConfig = await SettingsManager.getProfile(host);
 
         switch (message.type) {
             case "REQUEST":
-                if (!await SettingsManager.getEnabled()) {
+                if (!profileConfig.enabled) {
                     sendResponse();
                     manifests.clear();
                     return;
@@ -351,8 +355,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     sessionCnt[sender.tab.id]++;
                 }
 
+                if (!message.body) {
+                    setBadgeText("CK", sender.tab.id);
+                    sendResponse();
+                    return;
+                }
+
                 try {
                     JSON.parse(atob(message.body));
+                    setBadgeText("CK", sender.tab.id);
                     sendResponse(message.body);
                     return;
                 } catch {
@@ -375,45 +386,50 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                                         kids: log.keys.map(key => key.kid),
                                         type: "temporary"
                                     });
+                                    setBadgeText("CK", sender.tab.id);
                                     sendResponse(btoa(json));
                                     break;
                                 case "WIDEVINE":
-                                    const device_type = await SettingsManager.getSelectedDeviceType();
+                                    setBadgeText("WV", sender.tab.id);
+                                    const device_type = profileConfig.widevine.type;
                                     switch (device_type) {
-                                        case "WVD":
-                                            await generateChallenge(log.pssh_data, sendResponse, serverCert);
+                                        case "local":
+                                            await generateChallenge(host, log.pssh_data, sendResponse, serverCert);
                                             break;
-                                        case "REMOTE":
-                                            await generateChallengeRemote(log.pssh_data, sendResponse);
+                                        case "remote":
+                                            await generateChallengeRemote(host, log.pssh_data, sendResponse);
                                             break;
                                     }
                                     break;
                                 case "PLAYREADY": // UNTESTED
-                                    await generatePRChallenge(log.pssh_data, sendResponse, sessionId);
+                                    setBadgeText("PR", sender.tab.id);
+                                    await generatePRChallenge(host, log.pssh_data, sendResponse, sessionId);
                                     break;
                             }
                         } else if (message.body.startsWith("pr:")) {
-                            if (!await SettingsManager.getPREnabled()) {
+                            if (!profileConfig.playready.enabled) {
                                 sendResponse();
                                 manifests.clear();
                                 return;
                             }
+                            setBadgeText("PR", sender.tab.id);
                             const [ _, sessionId, wrmHeader ] = split;
-                            await generatePRChallenge(wrmHeader, sendResponse, sessionId);
+                            await generatePRChallenge(host, wrmHeader, sendResponse, sessionId);
                         } else {
-                            if (!await SettingsManager.getWVEnabled()) {
+                            if (!profileConfig.widevine.enabled) {
                                 sendResponse();
                                 manifests.clear();
                                 return;
                             }
+                            setBadgeText("WV", sender.tab.id);
                             const [ pssh, serverCert ] = split;
-                            const device_type = await SettingsManager.getSelectedDeviceType();
+                            const device_type = profileConfig.widevine.type;
                             switch (device_type) {
-                                case "WVD":
-                                    await generateChallenge(pssh, sendResponse, serverCert);
+                                case "local":
+                                    await generateChallenge(host, pssh, sendResponse, serverCert);
                                     break;
-                                case "REMOTE":
-                                    await generateChallengeRemote(pssh, sendResponse); // No serverCert support for remote yet
+                                case "remote":
+                                    await generateChallengeRemote(host, pssh, sendResponse); // No serverCert support for remote yet
                                     break;
                             }
                         }
@@ -422,7 +438,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 break;
 
             case "RESPONSE":
-                if (!await SettingsManager.getEnabled()) {
+                if (!profileConfig.enabled) {
                     sendResponse(message.body);
                     manifests.clear();
                     return;
@@ -433,27 +449,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     return;
                 } catch (e) {
                     if (message.body.startsWith("pr:")) {
-                        if (!await SettingsManager.getPREnabled()) {
+                        if (!profileConfig.playready.enabled) {
                             sendResponse();
                             manifests.clear();
                             return;
                         }
                         const split = message.body.split(':');
                         const decodedLicense = atob(split[2]);
-                        await parsePRLicense(decodedLicense, sendResponse, split[1], tab_url);
+                        await parsePRLicense(host, decodedLicense, sendResponse, split[1], tab_url);
                     } else {
-                            if (!await SettingsManager.getWVEnabled()) {
+                            if (!profileConfig.widevine.enabled) {
                                 sendResponse();
                                 manifests.clear();
                                 return;
                             }
-                            const device_type = await SettingsManager.getSelectedDeviceType();
+                            const device_type = profileConfig.widevine.type;
                             switch (device_type) {
-                                case "WVD":
-                                    await parseLicense(message.body, sendResponse, tab_url);
+                                case "local":
+                                    await parseLicense(host, message.body, sendResponse, tab_url);
                                     break;
-                                case "REMOTE":
-                                    await parseLicenseRemote(message.body, sendResponse, tab_url);
+                                case "remote":
+                                    await parseLicenseRemote(host, message.body, sendResponse, tab_url);
                                     break;
                             }
                     }
@@ -463,19 +479,39 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (sessionCnt[sender.tab.id]) {
                     if (--sessionCnt[sender.tab.id] === 0) {
                         setIcon("images/icon.png", sender.tab.id);
+                        setBadgeText(null, sender.tab.id);
                     }
                 }
                 sendResponse();
                 break;
-            case "GET_ENABLED":
-                if (await SettingsManager.getEnabled()) {
-                    sendResponse(JSON.stringify({
-                        wv: await SettingsManager.getWVEnabled(),
-                        pr: await SettingsManager.getPREnabled()
-                    }));
-                } else {
-                    sendResponse(false);
+            case "GET_PROFILE":
+                let wvEnabled = profileConfig.widevine.enabled;
+                if (wvEnabled) {
+                    if (profileConfig.widevine.type === "remote") {
+                        if (!profileConfig.widevine.device.remote) {
+                            wvEnabled = false;
+                        }
+                    } else if (!profileConfig.widevine.device.local) {
+                        wvEnabled = false;
+                    }
                 }
+                let prEnabled = profileConfig.playready.enabled;
+                if (prEnabled && !profileConfig.playready.device.local) {
+                    prEnabled = false;
+                }
+                sendResponse(JSON.stringify({
+                    enabled: profileConfig.enabled,
+                    widevine: {
+                        enabled: wvEnabled
+                    },
+                    playready: {
+                        enabled: prEnabled
+                    },
+                    clearkey: {
+                        enabled: profileConfig.clearkey.enabled
+                    },
+                    blockDisabled: profileConfig.blockDisabled
+                }));
                 break;
             case "GET_LOGS":
                 sendResponse(logs);
@@ -541,8 +577,8 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     delete sessionCnt[tabId];
 });
 
-(async () => {
-    if (!await SettingsManager.getEnabled()) {
+SettingsManager.getEnabled().then(enabled => {
+    if (!enabled) {
         setIcon("images/icon-disabled.png");
     }
-})();
+})

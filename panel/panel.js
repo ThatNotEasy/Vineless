@@ -1,49 +1,70 @@
 import "../protobuf.min.js";
 import "../license_protocol.js";
 import { Utils } from '../jsplayready/utils.js';
-import {AsyncLocalStorage, base64toUint8Array, stringToUint8Array, DeviceManager, RemoteCDMManager, PRDeviceManager, SettingsManager} from "../util.js";
+import {
+    AsyncLocalStorage,
+    base64toUint8Array,
+    stringToUint8Array,
+    getForegroundTab,
+    setIcon,
+    DeviceManager,
+    RemoteCDMManager,
+    PRDeviceManager,
+    SettingsManager
+} from "../util.js";
 
 const key_container = document.getElementById('key-container');
 const icon = document.getElementById('icon');
 
+let currentTab = null;
+
 // ================ Main ================
 const enabled = document.getElementById('enabled');
 enabled.addEventListener('change', async function (){
-    await SettingsManager.setEnabled(enabled.checked);
-    icon.src = `../images/icon${enabled.checked ? '' : '-disabled'}.png`;
+    applyConfig();
 });
 
-const toggle = document.getElementById('darkModeToggle');
+const toggle = document.getElementById('scopeToggle');
 toggle.addEventListener('change', async () => {
-    SettingsManager.setDarkMode(toggle.checked);
-    await SettingsManager.saveDarkMode(toggle.checked);
+    if (!toggle.checked) {
+        SettingsManager.removeProfile(new URL(currentTab.url).host);
+        loadConfig("global");
+    }
 });
+
+const siteScopeLabel = document.getElementById('siteScopeLabel');
 
 const version = document.getElementById('version');
-version.textContent = "v" + chrome.runtime.getManifest().version;
+version.textContent = "v" + chrome.runtime.getManifest().version + " Pre-release";
 
 const wvEnabled = document.getElementById('wvEnabled');
-wvEnabled.addEventListener('change', async function (){
-    await SettingsManager.setWVEnabled(wvEnabled.checked);
+wvEnabled.addEventListener('change', async function () {
+    applyConfig();
 });
 
 const prEnabled = document.getElementById('prEnabled');
-prEnabled.addEventListener('change', async function (){
-    await SettingsManager.setPREnabled(prEnabled.checked);
+prEnabled.addEventListener('change', async function () {
+    applyConfig();
+});
+
+const ckEnabled = document.getElementById('ckEnabled');
+ckEnabled.addEventListener('change', async function () {
+    applyConfig();
+});
+
+const blockDisabled = document.getElementById('blockDisabled');
+blockDisabled.addEventListener('change', async function () {
+    applyConfig();
 });
 
 const wvd_select = document.getElementById('wvd_select');
-wvd_select.addEventListener('change', async function (){
-    if (wvd_select.checked) {
-        await SettingsManager.saveSelectedDeviceType("WVD");
-    }
+wvd_select.addEventListener('change', async function () {
+    applyConfig();
 });
 
 const remote_select = document.getElementById('remote_select');
-remote_select.addEventListener('change', async function (){
-    if (remote_select.checked) {
-        await SettingsManager.saveSelectedDeviceType("REMOTE");
-    }
+remote_select.addEventListener('change', async function () {
+    applyConfig();
 });
 
 const export_button = document.getElementById('export');
@@ -61,20 +82,15 @@ document.getElementById('fileInput').addEventListener('click', () => {
 
 const remove = document.getElementById('remove');
 remove.addEventListener('click', async function() {
-    await DeviceManager.removeSelectedWidevineDevice();
+    await DeviceManager.removeWidevineDevice(wvd_combobox.options[wvd_combobox.selectedIndex]?.text || "");
     wvd_combobox.innerHTML = '';
     await DeviceManager.loadSetAllWidevineDevices();
-    const selected_option = wvd_combobox.options[wvd_combobox.selectedIndex];
-    if (selected_option) {
-        await DeviceManager.saveSelectedWidevineDevice(selected_option.text);
-    } else {
-        await DeviceManager.removeSelectedWidevineDeviceKey();
-    }
+    applyConfig();
 });
 
 const download = document.getElementById('download');
 download.addEventListener('click', async function() {
-    const widevine_device = await DeviceManager.getSelectedWidevineDevice();
+    const widevine_device = wvd_combobox.options[wvd_combobox.selectedIndex]?.text;
     SettingsManager.downloadFile(
         base64toUint8Array(await DeviceManager.loadWidevineDevice(widevine_device)),
         widevine_device + ".wvd"
@@ -83,7 +99,7 @@ download.addEventListener('click', async function() {
 
 const wvd_combobox = document.getElementById('wvd-combobox');
 wvd_combobox.addEventListener('change', async function() {
-    await DeviceManager.saveSelectedWidevineDevice(wvd_combobox.options[wvd_combobox.selectedIndex].text);
+    applyConfig();
 });
 // =================================================
 
@@ -95,20 +111,15 @@ document.getElementById('remoteInput').addEventListener('click', () => {
 
 const remote_remove = document.getElementById('remoteRemove');
 remote_remove.addEventListener('click', async function() {
-    await RemoteCDMManager.removeSelectedRemoteCDM();
+    await RemoteCDMManager.removeRemoteCDM(remote_combobox.options[remote_combobox.selectedIndex]?.text || "");
     remote_combobox.innerHTML = '';
     await RemoteCDMManager.loadSetAllRemoteCDMs();
-    const selected_option = remote_combobox.options[remote_combobox.selectedIndex];
-    if (selected_option) {
-        await RemoteCDMManager.saveSelectedRemoteCDM(selected_option.text);
-    } else {
-        await RemoteCDMManager.removeSelectedRemoteCDMKey();
-    }
+    applyConfig();
 });
 
 const remote_download = document.getElementById('remoteDownload');
 remote_download.addEventListener('click', async function() {
-    const remote_cdm = await RemoteCDMManager.getSelectedRemoteCDM();
+    const remote_cdm = remote_combobox.options[remote_combobox.selectedIndex]?.text;
     SettingsManager.downloadFile(
         await RemoteCDMManager.loadRemoteCDM(remote_cdm),
         remote_cdm + ".json"
@@ -117,7 +128,7 @@ remote_download.addEventListener('click', async function() {
 
 const remote_combobox = document.getElementById('remote-combobox');
 remote_combobox.addEventListener('change', async function() {
-    await RemoteCDMManager.saveSelectedRemoteCDM(remote_combobox.options[remote_combobox.selectedIndex].text);
+    applyConfig();
 });
 // ============================================
 
@@ -129,25 +140,20 @@ document.getElementById('prdInput').addEventListener('click', () => {
 
 const prd_combobox = document.getElementById('prd-combobox');
 prd_combobox.addEventListener('change', async function() {
-    await PRDeviceManager.saveSelectedPlayreadyDevice(prd_combobox.options[prd_combobox.selectedIndex].text);
+    applyConfig();
 });
 
 const prdRemove = document.getElementById('prdRemove');
 prdRemove.addEventListener('click', async function() {
-    await PRDeviceManager.removeSelectedPlayreadyDevice();
+    await PRDeviceManager.removePlayreadyDevice(prd_combobox.options[prd_combobox.selectedIndex]?.text || "");
     prd_combobox.innerHTML = '';
     await PRDeviceManager.loadSetAllPlayreadyDevices();
-    const selected_option = prd_combobox.options[prd_combobox.selectedIndex];
-    if (selected_option) {
-        await PRDeviceManager.saveSelectedPlayreadyDevice(selected_option.text);
-    } else {
-        await PRDeviceManager.removeSelectedPlayreadyDeviceKey();
-    }
+    applyConfig();
 });
 
 const prdDownload = document.getElementById('prdDownload');
 prdDownload.addEventListener('click', async function() {
-    const playready_device = await PRDeviceManager.getSelectedPlayreadyDevice();
+    const playready_device = prd_combobox.options[prd_combobox.selectedIndex]?.text;
     SettingsManager.downloadFile(
         Utils.base64ToBytes(await PRDeviceManager.loadPlayreadyDevice(playready_device)),
         playready_device + ".prd"
@@ -172,6 +178,7 @@ downloader_name.addEventListener('input', async function (event){
 const clear = document.getElementById('clear');
 clear.addEventListener('click', async function() {
     chrome.runtime.sendMessage({ type: "CLEAR" });
+    chrome.storage.local.clear();
     key_container.innerHTML = "";
 });
 
@@ -269,33 +276,74 @@ chrome.storage.onChanged.addListener(async (changes, areaName) => {
     }
 });
 
-function checkLogs() {
-    chrome.runtime.sendMessage({ type: "GET_LOGS" }, (response) => {
-        if (response) {
-            response.forEach(async (result) => {
-                await appendLog(result);
-            });
-        }
+async function checkLogs() {
+    const logs = await AsyncLocalStorage.getStorage(null);
+    Object.values(logs).forEach(async (result) => {
+        await appendLog(result);
     });
 }
 
+async function loadConfig(scope = "global") {
+    const profileConfig = await SettingsManager.getProfile(scope);
+    enabled.checked = profileConfig.enabled;
+    wvEnabled.checked = profileConfig.widevine.enabled;
+    prEnabled.checked = profileConfig.playready.enabled;
+    ckEnabled.checked = profileConfig.clearkey.enabled;
+    blockDisabled.checked = profileConfig.blockDisabled;
+    SettingsManager.setSelectedDeviceType(profileConfig.widevine.type);
+    await DeviceManager.selectWidevineDevice(profileConfig.widevine.device.local);
+    await RemoteCDMManager.selectRemoteCDM(profileConfig.widevine.device.remote);
+    await PRDeviceManager.selectPlayreadyDevice(profileConfig.playready.device.local);
+}
+
+async function applyConfig() {
+    const scope = toggle.checked ? new URL(currentTab.url).host : "global";
+    const config = {
+        "enabled": enabled.checked,
+        "widevine": {
+            "enabled": wvEnabled.checked,
+            "device": {
+                "local": wvd_combobox.options[wvd_combobox.selectedIndex]?.text || null,
+                "remote": remote_combobox.options[remote_combobox.selectedIndex]?.text || null
+            },
+            "type": wvd_select.checked ? "local" : "remote"
+        },
+        "playready": {
+            "enabled": prEnabled.checked,
+            "device": {
+                "local": prd_combobox.options[prd_combobox.selectedIndex]?.text || null
+            },
+            "type": "local"
+        },
+        "clearkey": {
+            "enabled": ckEnabled.checked
+        },
+        "blockDisabled": blockDisabled.checked
+    };
+    await SettingsManager.setProfile(scope, config);
+    if (scope === "global") {
+        setIcon(`images/icon${enabled.checked ? '' : '-disabled'}.png`);
+        icon.src = `../images/icon${enabled.checked ? '' : '-disabled'}.png`;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', async function () {
-    enabled.checked = await SettingsManager.getEnabled();
-    if (!enabled.checked) {
+    const globalConfig = await SettingsManager.getProfile("global");
+    if (!globalConfig.enabled) {
         icon.src = "../images/icon-disabled.png";
     }
-    SettingsManager.setDarkMode(await SettingsManager.getDarkMode());
-    wvEnabled.checked = await SettingsManager.getWVEnabled(true);
-    prEnabled.checked = await SettingsManager.getPREnabled(true);
+    currentTab = await getForegroundTab();
+    const host = new URL(currentTab.url).host;
+    if (await SettingsManager.profileExists(host)) {
+        toggle.checked = true;
+    }
+    siteScopeLabel.textContent = host;
     use_shaka.checked = await SettingsManager.getUseShakaPackager();
     downloader_name.value = await SettingsManager.getExecutableName();
-    SettingsManager.setSelectedDeviceType(await SettingsManager.getSelectedDeviceType());
     await DeviceManager.loadSetAllWidevineDevices();
-    await DeviceManager.selectWidevineDevice(await DeviceManager.getSelectedWidevineDevice());
     await RemoteCDMManager.loadSetAllRemoteCDMs();
-    await RemoteCDMManager.selectRemoteCDM(await RemoteCDMManager.getSelectedRemoteCDM());
     await PRDeviceManager.loadSetAllPlayreadyDevices();
-    await PRDeviceManager.selectPlayreadyDevice(await PRDeviceManager.getSelectedPlayreadyDevice());
     checkLogs();
+    loadConfig(host);
 });
 // ======================================
