@@ -5,6 +5,7 @@ body {
     width: 400px;
     overflow-x: hidden;
     user-select: none;
+    font-size: 13px;
 }
 .toggleButton {
     width: 24px;
