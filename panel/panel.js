@@ -6,7 +6,6 @@ import {
     base64toUint8Array,
     stringToUint8Array,
     getForegroundTab,
-    setIcon,
     DeviceManager,
     RemoteCDMManager,
     PRDeviceManager,
@@ -29,10 +28,17 @@ toggle.addEventListener('change', async () => {
     if (!toggle.checked) {
         SettingsManager.removeProfile(new URL(currentTab.url).host);
         loadConfig("global");
+        reloadButton.classList.remove("hidden");
     }
 });
 
 const siteScopeLabel = document.getElementById('siteScopeLabel');
+
+const reloadButton = document.getElementById('reload');
+reloadButton.addEventListener('click', async function () {
+    chrome.tabs.reload(currentTab.id);
+    window.close();
+});
 
 const version = document.getElementById('version');
 version.textContent = "v" + chrome.runtime.getManifest().version + " Pre-release";
@@ -285,7 +291,7 @@ async function checkLogs() {
 
 async function loadConfig(scope = "global") {
     const profileConfig = await SettingsManager.getProfile(scope);
-    enabled.checked = profileConfig.enabled;
+    enabled.checked = await SettingsManager.getGlobalEnabled() && profileConfig.enabled;
     wvEnabled.checked = profileConfig.widevine.enabled;
     prEnabled.checked = profileConfig.playready.enabled;
     ckEnabled.checked = profileConfig.clearkey.enabled;
@@ -294,6 +300,7 @@ async function loadConfig(scope = "global") {
     await DeviceManager.selectWidevineDevice(profileConfig.widevine.device.local);
     await RemoteCDMManager.selectRemoteCDM(profileConfig.widevine.device.remote);
     await PRDeviceManager.selectPlayreadyDevice(profileConfig.playready.device.local);
+    updateIcon();
 }
 
 async function applyConfig() {
@@ -321,17 +328,34 @@ async function applyConfig() {
         "blockDisabled": blockDisabled.checked
     };
     await SettingsManager.setProfile(scope, config);
-    if (scope === "global") {
-        setIcon(`images/icon${enabled.checked ? '' : '-disabled'}.png`);
-        icon.src = `../images/icon${enabled.checked ? '' : '-disabled'}.png`;
+    // If Vineless is globally disabled, per-site enabled config is completely ignored
+    // Enable both global and per-site when switching the per-site one to enabled, if global was disabled
+    if (scope === "global" || (config.enabled && !await SettingsManager.getGlobalEnabled())) {
+        await SettingsManager.setGlobalEnalbed(config.enabled);
+    }
+    reloadButton.classList.remove('hidden');
+    updateIcon();
+}
+
+async function getSessionCount() {
+    return new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ type: "GET_ACTIVE", body: currentTab.id }, (response) => {
+            resolve(response);
+        });
+    });
+}
+
+async function updateIcon() {
+    if (await getSessionCount()) {
+        icon.src = "../images/icon-active.png";
+    } else if (await SettingsManager.getGlobalEnabled()) {
+        icon.src = "../images/icon.png";
+    } else {
+        icon.src = "../images/icon-disabled.png";
     }
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
-    const globalConfig = await SettingsManager.getProfile("global");
-    if (!globalConfig.enabled) {
-        icon.src = "../images/icon-disabled.png";
-    }
     currentTab = await getForegroundTab();
     const host = new URL(currentTab.url).host;
     if (await SettingsManager.profileExists(host)) {

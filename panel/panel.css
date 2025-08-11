@@ -4,6 +4,7 @@ body {
     color: black;
     width: 400px;
     overflow-x: hidden;
+    user-select: none;
 }
 .toggleButton {
     width: 24px;
@@ -14,6 +15,7 @@ select {
 .text-box {
     outline: none;
     width: 80%;
+    user-select: auto;
 }
 #downloader-name {
     width: 160px;
@@ -62,6 +64,13 @@ select {
     opacity: 0;
     width: 0;
     height: 0;
+}
+
+#reload {
+    margin-left: auto;
+}
+#reload.hidden {
+    visibility: hidden;
 }
 
 /* Slider */

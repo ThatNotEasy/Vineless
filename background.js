@@ -12,6 +12,7 @@ import {
     setIcon,
     setBadgeText,
     SettingsManager,
+    ScriptManager,
     AsyncLocalStorage,
     RemoteCDMManager,
     PRDeviceManager
@@ -484,6 +485,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 }
                 sendResponse();
                 break;
+            case "GET_ACTIVE":
+                sendResponse(sessionCnt[message.body]);
+                break;
             case "GET_PROFILE":
                 let wvEnabled = profileConfig.widevine.enabled;
                 if (wvEnabled) {
@@ -577,8 +581,11 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     delete sessionCnt[tabId];
 });
 
-SettingsManager.getEnabled().then(enabled => {
+SettingsManager.getGlobalEnabled().then(enabled => {
     if (!enabled) {
         setIcon("images/icon-disabled.png");
+        ScriptManager.unregisterContentScript();
+    } else {
+        ScriptManager.registerContentScript();
     }
-})
+});

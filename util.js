@@ -309,9 +309,21 @@ export class SettingsManager {
         return result[scope] !== undefined;
     }
 
-    static async getEnabled() {
+    static async getGlobalEnabled() {
         const config = await SettingsManager.getProfile("global");
         return config.enabled;
+    }
+
+    static async setGlobalEnalbed(enabled) {
+        const config = await SettingsManager.getProfile("global");
+        config.enabled = enabled;
+        setIcon(`images/icon${enabled ? '' : '-disabled'}.png`);
+        if (enabled) {
+            await ScriptManager.registerContentScript();
+        } else {
+            await ScriptManager.unregisterContentScript();
+        }
+        await SettingsManager.setProfile("global", config);
     }
 
     static downloadFile(content, filename) {
@@ -449,6 +461,40 @@ export class SettingsManager {
     static async getExecutableName() {
         const result = await AsyncSyncStorage.getStorage(["exe_name"]);
         return result["exe_name"] ?? "N_m3u8DL-RE";
+    }
+}
+
+export class ScriptManager {
+    static id = "vl-content";
+
+    static async registerContentScript() {
+        const existing = await chrome.scripting.getRegisteredContentScripts({
+            ids: [this.id]
+        });
+        if (existing?.length) {
+            return;
+        }
+
+        await chrome.scripting.registerContentScripts([{
+            id: this.id,
+            js: ['content_script.js'],
+            matches: ['*://*/*'],
+            runAt: 'document_start',
+            world: 'MAIN',
+            allFrames: true,
+            matchOriginAsFallback: true,
+            persistAcrossSessions: true
+        }]);
+    }
+
+    static async unregisterContentScript() {
+        try {
+            await chrome.scripting.unregisterContentScripts({
+                ids: [this.id]
+            });
+        } catch {
+            // not registered
+        }
     }
 }
 

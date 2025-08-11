@@ -284,21 +284,19 @@
         return out;
     }
 
-    (async () => {
+    (() => {
         const requestMediaKeySystemAccessUnaltered = navigator.requestMediaKeySystemAccess;
         if (!requestMediaKeySystemAccessUnaltered) {
             console.error("[Vineless] EME not available!");
             return;
         }
 
-        const profileConfig = JSON.parse(await emitAndWaitForResponse("GET_PROFILE"));
-        //console.log(profileConfig)
-        if (!profileConfig.enabled) {
-            console.log("[Vineless] Vineless is disabled.");
-            return;
-        }
+        let profileConfig = null;
 
-        function getEnabledForKeySystem(keySystem, includeClearKey = true) {
+        async function getEnabledForKeySystem(keySystem, includeClearKey = true) {
+            if (!profileConfig) {
+                profileConfig = JSON.parse(await emitAndWaitForResponse("GET_PROFILE"));
+            }
             if (!keySystem) {
                 return false;
             }
@@ -322,7 +320,7 @@
                 try {
                     const origKeySystem = _args[0];
                     const origConfig = structuredClone(_args[1]);
-                    const enabled = getEnabledForKeySystem(origKeySystem);
+                    const enabled = await getEnabledForKeySystem(origKeySystem);
                     if (!enabled && profileConfig.blockDisabled) {
                         console.warn("[Vineless] Blocked a non-Vineless enabled EME keySystem:", origKeySystem);
                         _args[0] = "com.ingan121.vineless.invalid";
@@ -360,7 +358,7 @@
                 }
                 const origKeySystem = config?.keySystemConfiguration?.keySystem;
 
-                if (getEnabledForKeySystem(origKeySystem, false)) {
+                if (await getEnabledForKeySystem(origKeySystem, false)) {
                     console.log("[Vineless] Intercepted decodingInfo for", origKeySystem);
 
                     try {
@@ -472,7 +470,7 @@
                 console.log("[Vineless] setMediaKeys", _args);
                 const keys = _args[0];
                 const keySystem = keys?._emeShim?.origKeySystem;
-                if (!getEnabledForKeySystem(keySystem)) {
+                if (!await getEnabledForKeySystem(keySystem)) {
                     return await _target.apply(_this, _args);
                 }
 
@@ -550,7 +548,7 @@
             proxy(MediaKeys.prototype, 'setServerCertificate', async (_target, _this, _args) => {
                 console.log("[Vineless] setServerCertificate", _args[0]);
                 const keySystem = _this._emeShim?.origKeySystem;
-                if (!getEnabledForKeySystem(keySystem) || _this._ck) {
+                if (!await getEnabledForKeySystem(keySystem) || _this._ck) {
                     return await _target.apply(_this, _args);
                 }
                 if (keySystem.startsWith("com.widevine.alpha")) {
@@ -568,7 +566,7 @@
             proxy(MediaKeySession.prototype, 'generateRequest', async (_target, _this, _args) => {
                 console[_this._ck ? "debug" : "log"]("[Vineless] generateRequest" + (_this._ck ? " (Internal)" : ""), _args, "sessionId:", _this.sessionId);
                 const keySystem = _this._mediaKeys?._emeShim?.origKeySystem;
-                if (!getEnabledForKeySystem(keySystem) || _this._ck) {
+                if (!await getEnabledForKeySystem(keySystem) || _this._ck) {
                     return await _target.apply(_this, _args);
                 }
 
@@ -629,7 +627,7 @@
             proxy(MediaKeySession.prototype, 'update', async (_target, _this, _args) => {
                 console[_this._ck ? "debug" : "log"]("[Vineless] update" + (_this._ck ? " (Internal)" : ""), _args, "sessionId:", _this.sessionId);
                 const keySystem = _this._mediaKeys?._emeShim?.origKeySystem;
-                if (!getEnabledForKeySystem(keySystem) || _this._ck) {
+                if (!await getEnabledForKeySystem(keySystem) || _this._ck) {
                     !_this._ck && _this.addEventListener('keystatuseschange', () => {
                         const kidStasuses = {};
                         for (const [keyId, status] of _this.keyStatuses) {
@@ -725,7 +723,7 @@
                     _this._closeResolver({result: "closed-by-application"});
                 }
 
-                if (!getEnabledForKeySystem(keySystem) || _this._ck) {
+                if (!await getEnabledForKeySystem(keySystem) || _this._ck) {
                     return await _target.apply(_this, _args);
                 }
 
