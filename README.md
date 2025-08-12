@@ -11,6 +11,7 @@
 * This addon requires a Widevine/PlayReady Device file to work. Don't ask me where to get those.
 
 ## Compatibility
++ Compatible with multiple call (local/remote device)
 + Should be compatible with all modern browsers that supports the standard EME, the ClearKey CDM, and the Manifest V3 extensions
 + Tested browsers: Chrome, Edge, Firefox, Marble, and Supermium on Windows
 + Incompatible browsers:

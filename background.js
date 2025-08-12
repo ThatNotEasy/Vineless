@@ -519,17 +519,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     blockDisabled: profileConfig.blockDisabled
                 }));
                 break;
-            case "OPEN_PICKER_WVD":
+            // case "OPEN_PICKER_WVD":
+            //     if (message.from === "content") return;
+            //     openPopup('picker/wvd/filePicker.html', 300, 200);
+            //     break;
+            // case "OPEN_PICKER_REMOTE":
+            //     if (message.from === "content") return;
+            //     openPopup('picker/remote/filePicker.html', 300, 200);
+            //     break;
+            // case "OPEN_PICKER_PRD":
+            //     if (message.from === "content") return;
+            //     openPopup('picker/prd/filePicker.html', 300, 200);
+            //     break;
+            case "OPEN_PICKER_DEVICE":
                 if (message.from === "content") return;
-                openPopup('picker/wvd/filePicker.html', 300, 200);
-                break;
-            case "OPEN_PICKER_REMOTE":
-                if (message.from === "content") return;
-                openPopup('picker/remote/filePicker.html', 300, 200);
-                break;
-            case "OPEN_PICKER_PRD":
-                if (message.from === "content") return;
-                openPopup('picker/prd/filePicker.html', 300, 200);
+                openPopup('panel/filePicker.html', 500, 420); // unified picker
                 break;
             case "CLEAR":
                 if (message.from === "content") return;
