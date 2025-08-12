@@ -81,11 +81,23 @@ export_button.addEventListener('click', async function() {
 });
 // ======================================
 
+// ================ UnifiedPicker ================
+
+function openUnifiedPicker() {
+  chrome.runtime.sendMessage({ type: "OPEN_PICKER_DEVICE" });
+  window.close();
+}
+
+document.getElementById('fileInput').addEventListener('click', openUnifiedPicker);   // WVD
+document.getElementById('remoteInput').addEventListener('click', openUnifiedPicker); // Remote JSON
+document.getElementById('prdInput').addEventListener('click', openUnifiedPicker);    // PRD
+
+
 // ================ Widevine Device ================
-document.getElementById('fileInput').addEventListener('click', () => {
-    chrome.runtime.sendMessage({ type: "OPEN_PICKER_WVD" });
-    window.close();
-});
+// document.getElementById('fileInput').addEventListener('click', () => {
+//     chrome.runtime.sendMessage({ type: "OPEN_PICKER_WVD" });
+//     window.close();
+// });
 
 const remove = document.getElementById('remove');
 remove.addEventListener('click', async function() {
@@ -111,10 +123,10 @@ wvd_combobox.addEventListener('change', async function() {
 // =================================================
 
 // ================ Remote CDM ================
-document.getElementById('remoteInput').addEventListener('click', () => {
-    chrome.runtime.sendMessage({ type: "OPEN_PICKER_REMOTE" });
-    window.close();
-});
+// document.getElementById('remoteInput').addEventListener('click', () => {
+//     chrome.runtime.sendMessage({ type: "OPEN_PICKER_REMOTE" });
+//     window.close();
+// });
 
 const remote_remove = document.getElementById('remoteRemove');
 remote_remove.addEventListener('click', async function() {
@@ -140,10 +152,10 @@ remote_combobox.addEventListener('change', async function() {
 // ============================================
 
 // ================ Playready Device ================
-document.getElementById('prdInput').addEventListener('click', () => {
-    chrome.runtime.sendMessage({ type: "OPEN_PICKER_PRD" });
-    window.close();
-});
+// document.getElementById('prdInput').addEventListener('click', () => {
+//     chrome.runtime.sendMessage({ type: "OPEN_PICKER_PRD" });
+//     window.close();
+// });
 
 const prd_combobox = document.getElementById('prd-combobox');
 prd_combobox.addEventListener('change', async function() {
