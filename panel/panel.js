@@ -9,7 +9,8 @@ import {
     DeviceManager,
     RemoteCDMManager,
     PRDeviceManager,
-    SettingsManager
+    SettingsManager,
+    escapeHTML
 } from "../util.js";
 
 const key_container = document.getElementById('key-container');
@@ -205,14 +206,14 @@ async function appendLog(result) {
         <button class="toggleButton">+</button>
         <div class="expandableDiv collapsed">
             <label class="always-visible right-bound">
-                URL:<input type="text" class="text-box" value="${result.url}">
+                URL:<input type="text" class="text-box" value="${escapeHTML(result.url)}">
             </label>
             <label class="expanded-only right-bound">
                 Type:<input type="text" class="text-box" value="${result.type}">
             </label>
             <label class="expanded-only right-bound">
             <label class="expanded-only right-bound">
-                ${result.type === "PLAYREADY" ? "WRM" : "PSSH"}:<input type="text" class="text-box" value='${result.pssh_data || result.wrm_header}'>
+                ${result.type === "PLAYREADY" ? "WRM" : "PSSH"}:<input type="text" class="text-box" value='${escapeHTML(result.pssh_data || result.wrm_header)}'>
             </label>
             <label class="expanded-only right-bound key-copy">
                 <a href="#" title="Click to copy">Keys:</a><input type="text" class="text-box" value="${key_string}">
@@ -272,6 +273,8 @@ async function appendLog(result) {
     });
 
     key_container.appendChild(logContainer);
+
+    updateIcon();
 }
 
 chrome.storage.onChanged.addListener(async (changes, areaName) => {

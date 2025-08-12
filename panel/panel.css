@@ -66,6 +66,15 @@ select {
     width: 0;
     height: 0;
 }
+#siteScopeLabel {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+    direction: rtl;
+    height: 12px;
+}
 
 #reload {
     margin-left: auto;

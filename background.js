@@ -11,6 +11,7 @@ import {
     getWvPsshFromConcatPssh,
     setIcon,
     setBadgeText,
+    openPopup,
     SettingsManager,
     ScriptManager,
     AsyncLocalStorage,
@@ -486,6 +487,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 sendResponse();
                 break;
             case "GET_ACTIVE":
+                if (message.from === "content") return;
                 sendResponse(sessionCnt[message.body]);
                 break;
             case "GET_PROFILE":
@@ -517,34 +519,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     blockDisabled: profileConfig.blockDisabled
                 }));
                 break;
-            case "GET_LOGS":
-                sendResponse(logs);
-                break;
             case "OPEN_PICKER_WVD":
-                chrome.windows.create({
-                    url: 'picker/wvd/filePicker.html',
-                    type: 'popup',
-                    width: 300,
-                    height: 200,
-                });
+                if (message.from === "content") return;
+                openPopup('picker/wvd/filePicker.html', 300, 200);
                 break;
             case "OPEN_PICKER_REMOTE":
-                chrome.windows.create({
-                    url: 'picker/remote/filePicker.html',
-                    type: 'popup',
-                    width: 300,
-                    height: 200,
-                });
+                if (message.from === "content") return;
+                openPopup('picker/remote/filePicker.html', 300, 200);
                 break;
             case "OPEN_PICKER_PRD":
-                chrome.windows.create({
-                    url: 'picker/prd/filePicker.html',
-                    type: 'popup',
-                    width: 300,
-                    height: 200,
-                });
+                if (message.from === "content") return;
+                openPopup('picker/prd/filePicker.html', 300, 200);
                 break;
             case "CLEAR":
+                if (message.from === "content") return;
                 logs = [];
                 manifests.clear()
                 break;

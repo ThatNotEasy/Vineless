@@ -597,6 +597,7 @@ export async function setBadgeText(text, tabId = undefined) {
             text,
             ...(tabId ? { tabId } : {})
         });
+        chrome.browserAction.setBadgeBackgroundColor({ color: "#2169eb" });
         return;
     }
 
@@ -604,6 +605,7 @@ export async function setBadgeText(text, tabId = undefined) {
         text,
         ...(tabId ? { tabId } : {})
     });
+    chrome.action.setBadgeBackgroundColor({ color: "#2169eb" });
 }
 
 export async function getForegroundTab() {
@@ -614,4 +616,27 @@ export async function getForegroundTab() {
             }
         });
     });
+}
+
+export async function openPopup(url, width, height) {
+    const options = { url };
+    if (!chrome.windows?.create || navigator.userAgent.includes("Android") || navigator.userAgent.includes("iPhone OS")) {
+        options.active = true;
+        return await chrome.tabs.create(options);
+    }
+    options.type = 'popup';
+    options.width = width;
+    options.height = height;
+    return await chrome.windows.create(options);
+}
+
+export function escapeHTML(str) {
+    if (typeof str !== 'string') return str;
+    return str.replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+    }[tag] || tag));
 }
