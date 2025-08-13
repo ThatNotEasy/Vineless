@@ -1,8 +1,8 @@
-import "./protobuf.min.js";
-import "./license_protocol.js";
-import "./forge.min.js";
+import "./modules/jswidevine/protobuf.min.js";
+import "./modules/jswidevine/license_protocol.js";
+import "./modules/jswidevine/forge.min.js";
 
-import { Session } from "./license.js";
+import { Session } from "./modules/jswidevine/license.js";
 import {
     DeviceManager,
     base64toUint8Array,
@@ -17,16 +17,16 @@ import {
     AsyncLocalStorage,
     RemoteCDMManager,
     PRDeviceManager
-} from "./util.js";
-import { WidevineDevice } from "./device.js";
-import { RemoteCdm } from "./remote_cdm.js";
+} from "./modules/jswidevine/util.js";
+import { WidevineDevice } from "./modules/jswidevine/device.js";
+import { RemoteCdm } from "./modules/remote_cdm.js";
 
 const { LicenseType, SignedMessage, LicenseRequest, License } = protobuf.roots.default.license_protocol;
 
-import { Cdm } from './jsplayready/cdm.js';
-import { Device } from "./jsplayready/device.js";
-import { Utils } from "./jsplayready/utils.js";
-import { utils } from "./jsplayready/noble-curves.min.js";
+import { Cdm } from './modules/jsplayready/cdm.js';
+import { Device } from "./modules/jsplayready/device.js";
+import { Utils } from "./modules/jsplayready/utils.js";
+import { utils } from "./modules/jsplayready/noble-curves.min.js";
 
 let manifests = new Map();
 let requests = new Map();
@@ -352,7 +352,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
                 if (!sessionCnt[sender.tab.id]) {
                     sessionCnt[sender.tab.id] = 1;
-                    setIcon("images/icon-active.png", sender.tab.id);
+                    setIcon("panel/img/icon-active.png", sender.tab.id);
                 } else {
                     sessionCnt[sender.tab.id]++;
                 }
@@ -480,7 +480,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             case "CLOSE":
                 if (sessionCnt[sender.tab.id]) {
                     if (--sessionCnt[sender.tab.id] === 0) {
-                        setIcon("images/icon.png", sender.tab.id);
+                        setIcon("panel/img/icon.png", sender.tab.id);
                         setBadgeText(null, sender.tab.id);
                     }
                 }
@@ -575,7 +575,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 SettingsManager.getGlobalEnabled().then(enabled => {
     if (!enabled) {
-        setIcon("images/icon-disabled.png");
+        setIcon("panel/img/icon-disabled.png");
         ScriptManager.unregisterContentScript();
     } else {
         ScriptManager.registerContentScript();

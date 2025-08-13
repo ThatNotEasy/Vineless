@@ -1,0 +1,9 @@
+{
+  "cdmType": "PLAYREADY" | "WIDEVINE",
+  "deviceType": "CHROME" | "WINDOWS" | "ANDROID" | etc.,
+  "systemId": "unique-system-id",
+  "securityLevel": 1-3000,
+  "host": "https://your-cdm-api.com",
+  "secret": "your-api-secret-key",
+  "deviceName": "your-device-name"
+}

@@ -1,6 +1,6 @@
-import "../protobuf.min.js";
-import "../license_protocol.js";
-import { Utils } from '../jsplayready/utils.js';
+import "../../../modules/jswidevine/protobuf.min.js";
+import "../../../modules/jswidevine/license_protocol.js";
+import { Utils } from '../../../modules/jsplayready/utils.js';
 import {
     AsyncLocalStorage,
     base64toUint8Array,
@@ -11,7 +11,7 @@ import {
     PRDeviceManager,
     SettingsManager,
     escapeHTML
-} from "../util.js";
+} from "../../../modules/jswidevine/util.js";
 
 const key_container = document.getElementById('key-container');
 const icon = document.getElementById('icon');
@@ -362,11 +362,11 @@ async function getSessionCount() {
 
 async function updateIcon() {
     if (await getSessionCount()) {
-        icon.src = "../images/icon-active.png";
+        icon.src = "../panel/img/icon-active.png";
     } else if (await SettingsManager.getGlobalEnabled()) {
-        icon.src = "../images/icon.png";
+        icon.src = "../panel/img/icon.png";
     } else {
-        icon.src = "../images/icon-disabled.png";
+        icon.src = "../panel/img/icon-disabled.png";
     }
 }
 

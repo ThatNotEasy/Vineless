@@ -1,5 +1,5 @@
 import { WidevineDevice } from "./device.js";
-import { RemoteCdm } from "./remote_cdm.js";
+import { RemoteCdm } from "../remote_cdm.js";
 
 export class AsyncSyncStorage {
     static async setStorage(items) {
@@ -317,7 +317,7 @@ export class SettingsManager {
     static async setGlobalEnalbed(enabled) {
         const config = await SettingsManager.getProfile("global");
         config.enabled = enabled;
-        setIcon(`images/icon${enabled ? '' : '-disabled'}.png`);
+        setIcon(`panel/img/icon${enabled ? '' : '-disabled'}.png`);
         if (enabled) {
             await ScriptManager.registerContentScript();
         } else {

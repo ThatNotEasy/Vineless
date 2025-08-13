@@ -1,6 +1,6 @@
-import "../protobuf.min.js";
-    import "../license_protocol.js";
-    import { SettingsManager } from "../util.js";
+import "../../../modules/jswidevine/protobuf.min.js";
+    import "../../../modules/jswidevine/license_protocol.js";
+    import { SettingsManager } from "../../../modules/jswidevine/util.js";
 
     const fileInput = document.getElementById('fileInput');
     const urlBtn = document.getElementById('urlImport');
